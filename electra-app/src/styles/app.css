@@ -1,0 +1,11 @@
+html, body, #root, .app-shell {
+  height: 100%;
+  margin: 0;
+  background: #0f172a;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+}
+.app-shell { 
+  display: flex; 
+  flex-direction: column; 
+}
