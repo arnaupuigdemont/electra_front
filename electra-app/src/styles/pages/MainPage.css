@@ -1,0 +1,27 @@
+.main-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+background: radial-gradient(1800px 1000px at 50% -20%, rgba(29, 96, 239, 0.12), transparent 75%),
+                        radial-gradient(1600px 900px at 100% -10%, rgba(14, 229, 157, 0.10), transparent 75%),
+                        #0f172a;
+}
+.main-page-inner {
+  max-width: 920px;
+  padding: 48px 16px 80px;
+  text-align: center;
+  color: #e2e8f0;
+}
+.main-page-title {
+  font-size: clamp(36px, 7.5vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+  margin-bottom: 16px;
+}
+.main-page-desc {
+  font-size: clamp(16px, 2.5vw, 20px);
+  line-height: 1.6;
+  color: #cbd5e1;
+}
