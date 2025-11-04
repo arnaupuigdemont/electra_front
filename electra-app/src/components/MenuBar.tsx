@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import '../styles/components/MenuBar.css';
 import { useGridModel } from '../hooks/GridContext';
 import { useGridUpload } from '../hooks/useGridUpload';
+import ConfirmModal from './ConfirmModal';
+import { deleteGrid } from '../services/gridcalApi';
 
 interface MenuItem {
   label: string;
@@ -16,8 +18,11 @@ const MenuBar: React.FC = () => {
   // Track which menu label is open so we can render left/right groups independently
   const [openLabel, setOpenLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { setModel } = useGridModel();
-  const { upload, isUploading, error } = useGridUpload(setModel);
+  const { selectedGridId, setSelectedGridId } = useGridModel();
+  const { upload, isUploading, error } = useGridUpload((res) => setSelectedGridId(res.grid_id));
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
 
   const triggerFileDialog = () => fileInputRef.current?.click();
 
@@ -33,6 +38,28 @@ const MenuBar: React.FC = () => {
     }
   };
 
+  const openCloseDialog = () => {
+    setCloseError(null);
+    setShowCloseConfirm(true);
+    // also hide dropdown
+    setOpenLabel(null);
+  };
+
+  const onConfirmClose = async () => {
+    if (selectedGridId == null) return;
+    try {
+      setIsClosing(true);
+      setCloseError(null);
+      await deleteGrid(selectedGridId);
+      // refresh the whole page so the grid disappears
+      window.location.reload();
+    } catch (e: any) {
+      setCloseError(e?.message ?? 'Failed to close the grid');
+    } finally {
+      setIsClosing(false);
+    }
+  };
+
   const menuModel: MenuItem[] = [
     {
       label: 'File',
@@ -40,7 +67,7 @@ const MenuBar: React.FC = () => {
         { label: isUploading ? 'Opening...' : 'Open…', action: isUploading ? undefined : triggerFileDialog, disabled: isUploading },
         { label: 'Save (soon)', disabled: true },
         { label: 'Export (soon)', disabled: true },
-        { label: 'Close (soon)', disabled: true }
+        { label: 'Close…', action: selectedGridId != null && !isUploading ? openCloseDialog : undefined, disabled: selectedGridId == null || isUploading }
       ]
     },
     { label: 'View', items: [{ label: 'Reset Zoom (soon)', disabled: true }] },
@@ -116,6 +143,17 @@ const MenuBar: React.FC = () => {
           </div>
         ))}
       </div>
+      <ConfirmModal
+        isOpen={showCloseConfirm}
+        title="Close Grid"
+        message="Are you sure you want to close the Grid?"
+        confirmText="Yes, close"
+        cancelText="No"
+        onConfirm={onConfirmClose}
+        onCancel={() => { if (!isClosing) setShowCloseConfirm(false); }}
+        isBusy={isClosing}
+        errorText={closeError}
+      />
     </div>
   );
 };

@@ -5,13 +5,20 @@ import type { GridModel } from '../services/gridcalApi';
 interface GridCtx {
   model: GridModel | null;
   setModel: (m: GridModel | null) => void;
+  selectedGridId: number | null;
+  setSelectedGridId: (id: number | null) => void;
 }
 
 const Ctx = createContext<GridCtx | undefined>(undefined);
 
 export const GridProvider = ({ children }: { children: ReactNode }) => {
   const [model, setModel] = useState<GridModel | null>(null);
-  return <Ctx.Provider value={{ model, setModel }}>{children}</Ctx.Provider>;
+  const [selectedGridId, setSelectedGridId] = useState<number | null>(null);
+  return (
+    <Ctx.Provider value={{ model, setModel, selectedGridId, setSelectedGridId }}>
+      {children}
+    </Ctx.Provider>
+  );
 };
 
 export function useGridModel() {

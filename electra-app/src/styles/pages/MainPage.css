@@ -8,7 +8,7 @@ background: radial-gradient(1800px 1000px at 50% -20%, rgba(29, 96, 239, 0.12), 
                         #0f172a;
 }
 .main-page-inner {
-  max-width: 920px;
+  max-width: 1400px;
   padding: 48px 16px 80px;
   text-align: center;
   color: #e2e8f0;
@@ -24,4 +24,11 @@ background: radial-gradient(1800px 1000px at 50% -20%, rgba(29, 96, 239, 0.12), 
   font-size: clamp(16px, 2.5vw, 20px);
   line-height: 1.6;
   color: #cbd5e1;
+}
+
+/* Full-bleed section for the deck.gl viewer */
+.main-page-viewer-bleed {
+  margin-top: 20px;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
 }
