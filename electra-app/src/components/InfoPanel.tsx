@@ -1,4 +1,5 @@
 import React from 'react';
+import type { BusDetails } from '../services/gridcalApi';
 
 export type SelectedItem =
   | { kind: 'bus'; data: any }
@@ -11,11 +12,12 @@ export type SelectedItem =
 interface InfoPanelProps {
   selected: SelectedItem | null;
   onClose: () => void;
+  busDetails?: BusDetails | null;
 }
 
 const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: 6 };
 
-const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose }) => {
+const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails }) => {
   if (!selected) return null;
 
   const Box: React.CSSProperties = {
@@ -41,9 +43,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose }) => {
         return (
           <>
             <div style={rowStyle}><span>Name</span><span style={Muted as any}>{b.name || b.idtag}</span></div>
-            <div style={rowStyle}><span>Idtag</span><span style={Muted as any}>{b.idtag}</span></div>
             <div style={rowStyle}><span>Coords</span><span style={Muted as any}>({b.x}, {b.y})</span></div>
-            {b.grid_id != null && <div style={rowStyle}><span>Grid</span><span style={Muted as any}>{b.grid_id}</span></div>}
+            {busDetails && (
+              <>
+                <div style={Divider} />
+                <div style={rowStyle}><span>Slack</span><span style={Muted as any}>{String(busDetails.is_slack)}</span></div>
+                {busDetails.vnom != null && <div style={rowStyle}><span>Vnom</span><span style={Muted as any}>{busDetails.vnom}</span></div>}
+                {busDetails.vmin != null && <div style={rowStyle}><span>Vmin/Vmax</span><span style={Muted as any}>{busDetails.vmin} / {busDetails.vmax}</span></div>}
+                {busDetails.angle_min != null && <div style={rowStyle}><span>Angle range</span><span style={Muted as any}>{busDetails.angle_min} .. {busDetails.angle_max}</span></div>}
+                {busDetails.graphic_type && <div style={rowStyle}><span>Graphic</span><span style={Muted as any}>{busDetails.graphic_type}</span></div>}
+                {(busDetails.h != null || busDetails.w != null) && <div style={rowStyle}><span>H×W</span><span style={Muted as any}>{busDetails.h} × {busDetails.w}</span></div>}
+              </>
+            )}
           </>
         );
       }

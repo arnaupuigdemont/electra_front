@@ -3,12 +3,12 @@ import DeckGL from '@deck.gl/react';
 import { OrthographicView } from '@deck.gl/core';
 import { LineLayer } from '@deck.gl/layers';
 import * as DeckLayers from '@deck.gl/layers';
-import { listBuses, listLines, listTransformers2w, listGenerators, listShunts, listLoads } from '../services/gridcalApi';
+import { listBuses, listLines, listTransformers2w, listGenerators, listShunts, listLoads, getBus } from '../services/gridcalApi';
 import busIconUrl from '../assets/bus_image.png';
 import generatorIconUrl from '../assets/generator_image.png';
 import loadIconUrl from '../assets/load_image.png';
 import shuntIconUrl from '../assets/shunt_image.png';
-import type { Bus, Line, Transformer2W, Generator, Shunt, Load } from '../services/gridcalApi';
+import type { Bus, Line, Transformer2W, Generator, Shunt, Load, BusDetails } from '../services/gridcalApi';
 import InfoPanel, { type SelectedItem } from './InfoPanel';
 import { useGridModel } from '../hooks/GridContext';
 
@@ -32,6 +32,8 @@ const GridViewer: React.FC = () => {
   const [viewState, setViewState] = useState<ViewState>(initialView);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
+  const [busDetails, setBusDetails] = useState<BusDetails | null>(null);
+  const [busDetailsCache, setBusDetailsCache] = useState<Record<number, BusDetails>>({});
 
   useEffect(() => {
     if (selectedGridId == null) return;
@@ -56,6 +58,27 @@ const GridViewer: React.FC = () => {
       }
     })();
   }, [selectedGridId]);
+
+  // Fetch extra bus details when a bus is selected
+  useEffect(() => {
+    const run = async () => {
+      if (!selected || selected.kind !== 'bus') { setBusDetails(null); return; }
+      const b = selected.data as Bus;
+      if (b?.id == null) { setBusDetails(null); return; }
+      // cache first
+      const cached = busDetailsCache[b.id];
+      if (cached) { setBusDetails(cached); return; }
+      try {
+        const det = await getBus(b.id);
+        setBusDetails(det);
+        setBusDetailsCache(prev => ({ ...prev, [b.id]: det }));
+      } catch (e) {
+        // ignore; panel will show base fields only
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   const filtered = useMemo(() => {
     if (selectedGridId == null) return { buses: [], lines: [], transformers: [], generators: [], shunts: [], loads: [] };
@@ -477,7 +500,7 @@ const GridViewer: React.FC = () => {
       />
       {selected && (
         <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-          <InfoPanel selected={selected} onClose={() => setSelected(null)} />
+          <InfoPanel selected={selected} onClose={() => setSelected(null)} busDetails={busDetails} />
         </div>
       )}
       </div>

@@ -17,6 +17,7 @@ export interface UploadResult {
 }
 
 export interface Bus {
+  id: number;
   grid_id: number;
   idtag: string;
   name: string;
@@ -24,6 +25,41 @@ export interface Bus {
   y: number;
   longitude?: number;
   latitude?: number;
+  is_slack?: boolean;
+}
+
+export interface BusDetails extends Bus {
+  code?: string;
+  vnom?: number;
+  vm0?: number;
+  va0?: number;
+  vmin?: number;
+  vmax?: number;
+  vm_cost?: number;
+  angle_min?: number;
+  angle_max?: number;
+  angle_cost?: number;
+  r_fault?: number;
+  x_fault?: number;
+  active?: boolean;
+  is_dc?: boolean;
+  graphic_type?: string;
+  h?: number;
+  w?: number;
+  country?: string | null;
+  area?: string | null;
+  zone?: string | null;
+  substation?: string | null;
+  voltage_level?: string | null;
+  bus_bar?: string | null;
+  ph_a?: boolean;
+  ph_b?: boolean;
+  ph_c?: boolean;
+  ph_n?: boolean;
+  is_grounded?: boolean;
+  active_prof?: any;
+  vmin_prof?: any;
+  vmax_prof?: any;
 }
 
 export interface Line {
@@ -91,6 +127,12 @@ export async function listGridIds(): Promise<number[]> {
 export async function listBuses(): Promise<Bus[]> {
   const resp = await fetch(`${BASE_URL}/bus/`);
   if (!resp.ok) throw new Error(`Failed to fetch buses (${resp.status})`);
+  return resp.json();
+}
+
+export async function getBus(bus_id: number): Promise<BusDetails> {
+  const resp = await fetch(`${BASE_URL}/bus/${bus_id}`);
+  if (!resp.ok) throw new Error(`Failed to fetch bus (${resp.status})`);
   return resp.json();
 }
 
