@@ -3,7 +3,7 @@ import DeckGL from '@deck.gl/react';
 import { OrthographicView } from '@deck.gl/core';
 import { LineLayer } from '@deck.gl/layers';
 import * as DeckLayers from '@deck.gl/layers';
-import { listBuses, listLines, listTransformers2w, listGenerators, listShunts, listLoads, getBus } from '../services/gridcalApi';
+import { listBuses, listLines, listTransformers2w, listGenerators, listShunts, listLoads, getBus, getLoad, getGenerator, getShunt, getLine, getTransformer2W } from '../services/gridcalApi';
 import busIconUrl from '../assets/bus_image.png';
 import generatorIconUrl from '../assets/generator_image.png';
 import loadIconUrl from '../assets/load_image.png';
@@ -34,6 +34,16 @@ const GridViewer: React.FC = () => {
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [busDetails, setBusDetails] = useState<BusDetails | null>(null);
   const [busDetailsCache, setBusDetailsCache] = useState<Record<number, BusDetails>>({});
+  const [loadDetails, setLoadDetails] = useState<Load | null>(null);
+  const [loadDetailsCache, setLoadDetailsCache] = useState<Record<number, Load>>({});
+  const [generatorDetails, setGeneratorDetails] = useState<Generator | null>(null);
+  const [generatorDetailsCache, setGeneratorDetailsCache] = useState<Record<number, Generator>>({});
+  const [shuntDetails, setShuntDetails] = useState<Shunt | null>(null);
+  const [shuntDetailsCache, setShuntDetailsCache] = useState<Record<number, Shunt>>({});
+  const [lineDetails, setLineDetails] = useState<Line | null>(null);
+  const [lineDetailsCache, setLineDetailsCache] = useState<Record<number, Line>>({});
+  const [transformerDetails, setTransformerDetails] = useState<Transformer2W | null>(null);
+  const [transformerDetailsCache, setTransformerDetailsCache] = useState<Record<number, Transformer2W>>({});
 
   useEffect(() => {
     if (selectedGridId == null) return;
@@ -80,6 +90,113 @@ const GridViewer: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
+  // Fetch extra load details when a load is selected
+  useEffect(() => {
+    const run = async () => {
+      if (!selected || selected.kind !== 'load') { setLoadDetails(null); return; }
+      const loadData = selected.data as any;
+      // Try to get id from the load object if it exists
+      const loadId = loadData?.id;
+      if (loadId == null) { setLoadDetails(null); return; }
+      // cache first
+      const cached = loadDetailsCache[loadId];
+      if (cached) { setLoadDetails(cached); return; }
+      try {
+        const det = await getLoad(loadId);
+        setLoadDetails(det);
+        setLoadDetailsCache(prev => ({ ...prev, [loadId]: det }));
+      } catch (e) {
+        // ignore; panel will show base fields only
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  // Fetch extra generator details when a generator is selected
+  useEffect(() => {
+    const run = async () => {
+      if (!selected || selected.kind !== 'generator') { setGeneratorDetails(null); return; }
+      const genData = selected.data as any;
+      const genId = genData?.id;
+      if (genId == null) { setGeneratorDetails(null); return; }
+      const cached = generatorDetailsCache[genId];
+      if (cached) { setGeneratorDetails(cached); return; }
+      try {
+        const det = await getGenerator(genId);
+        setGeneratorDetails(det);
+        setGeneratorDetailsCache(prev => ({ ...prev, [genId]: det }));
+      } catch (e) {
+        // ignore; panel will show base fields only
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  // Fetch extra shunt details when a shunt is selected
+  useEffect(() => {
+    const run = async () => {
+      if (!selected || selected.kind !== 'shunt') { setShuntDetails(null); return; }
+      const shuntData = selected.data as any;
+      const shuntId = shuntData?.id;
+      if (shuntId == null) { setShuntDetails(null); return; }
+      const cached = shuntDetailsCache[shuntId];
+      if (cached) { setShuntDetails(cached); return; }
+      try {
+        const det = await getShunt(shuntId);
+        setShuntDetails(det);
+        setShuntDetailsCache(prev => ({ ...prev, [shuntId]: det }));
+      } catch (e) {
+        // ignore; panel will show base fields only
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  // Fetch extra line details when a line is selected
+  useEffect(() => {
+    const run = async () => {
+      if (!selected || selected.kind !== 'line') { setLineDetails(null); return; }
+      const lineData = selected.data as any;
+      const lineId = lineData?.id;
+      if (lineId == null) { setLineDetails(null); return; }
+      const cached = lineDetailsCache[lineId];
+      if (cached) { setLineDetails(cached); return; }
+      try {
+        const det = await getLine(lineId);
+        setLineDetails(det);
+        setLineDetailsCache(prev => ({ ...prev, [lineId]: det }));
+      } catch (e) {
+        // ignore; panel will show base fields only
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  // Fetch extra transformer details when a transformer is selected
+  useEffect(() => {
+    const run = async () => {
+      if (!selected || selected.kind !== 'transformer') { setTransformerDetails(null); return; }
+      const transformerData = selected.data as any;
+      const transformerId = transformerData?.id;
+      if (transformerId == null) { setTransformerDetails(null); return; }
+      const cached = transformerDetailsCache[transformerId];
+      if (cached) { setTransformerDetails(cached); return; }
+      try {
+        const det = await getTransformer2W(transformerId);
+        setTransformerDetails(det);
+        setTransformerDetailsCache(prev => ({ ...prev, [transformerId]: det }));
+      } catch (e) {
+        // ignore; panel will show base fields only
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
   const filtered = useMemo(() => {
     if (selectedGridId == null) return { buses: [], lines: [], transformers: [], generators: [], shunts: [], loads: [] };
     const fb = buses.filter(b => b.grid_id === selectedGridId);
@@ -109,8 +226,8 @@ const GridViewer: React.FC = () => {
   }, [filtered.buses]);
 
   const BUS_ICON_URL = busIconUrl as unknown as string;
-  // Tune these to visually match the dot diameter from ScatterplotLayer (radius ~6-7px -> diameter ~12-14px)
-  const BUS_ICON_SIZE_PX = 48; // increased size for better visibility
+  // Base sizes (scaled later by zoomMult)
+  const BUS_ICON_SIZE_PX = 48;
   const BUS_TEXT_SIZE_PX = 12;
   const LOAD_ICON_URL = loadIconUrl as unknown as string;
   const LOAD_ICON_SIZE_PX = 30;
@@ -118,17 +235,27 @@ const GridViewer: React.FC = () => {
   const GENERATOR_ICON_SIZE_PX = 30;
   const SHUNT_ICON_URL = shuntIconUrl as unknown as string;
   const SHUNT_ICON_SIZE_PX = 30;
+
+  // Zoom-based multiplier (clamped) to scale icons & labels
+  const zoomMult = useMemo(() => {
+    const z = viewState?.zoom ?? 0;
+    // Exponential scaling, clamp to avoid extremes
+    const m = Math.pow(2, z);
+    return Math.max(0.8, Math.min(2.2, m));
+  }, [viewState?.zoom]);
   const busIconLayer = new (DeckLayers as any).IconLayer({
     id: 'buses-layer',
     data: filtered.buses,
     // Center the icon exactly at the bus coordinates and render original pixels (no masking)
     getIcon: () => ({ url: BUS_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
     getPosition: (d: Bus) => [d.x, d.y],
-    getSize: BUS_ICON_SIZE_PX,
+    getSize: () => BUS_ICON_SIZE_PX * zoomMult,
     sizeUnits: 'pixels',
     sizeMinPixels: 12,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
+    parameters: { depthTest: false },
+    updateTriggers: { getSize: [zoomMult] },
   });
 
   const busNameLayer = new (DeckLayers as any).TextLayer({
@@ -136,14 +263,18 @@ const GridViewer: React.FC = () => {
     data: filtered.buses,
     getPosition: (d: Bus) => [d.x, d.y],
     getText: (b: Bus) => b.name || b.idtag,
-  getSize: BUS_TEXT_SIZE_PX,
+    getSize: () => BUS_TEXT_SIZE_PX * zoomMult,
     sizeUnits: 'pixels',
-  getPixelOffset: [Math.round(BUS_ICON_SIZE_PX * 0.5) + 8, -Math.round(BUS_ICON_SIZE_PX * 0.5)],
+    getPixelOffset: () => {
+      const s = BUS_ICON_SIZE_PX * zoomMult;
+      return [Math.round(s * 0.5) + 8, -Math.round(s * 0.5)];
+    },
     getColor: [240, 240, 240, 255],
     background: true,
     backgroundColor: [17, 24, 39, 180],
     backgroundPadding: [4, 2],
     pickable: false,
+    updateTriggers: { getSize: [zoomMult], getPixelOffset: [zoomMult] },
   });
 
   // Build map idtag -> position (bus_from/bus_to refer to idtag)
@@ -166,9 +297,9 @@ const GridViewer: React.FC = () => {
         const a = posByIdtag.get(kFrom);
         const b = posByIdtag.get(kTo);
         if (!a || !b) return null;
-        return { source: a, target: b, fromKey: (l as any).bus_from_idtag, toKey: (l as any).bus_to_idtag };
+        return { source: a, target: b, fromKey: (l as any).bus_from_idtag, toKey: (l as any).bus_to_idtag, id: (l as any).id };
       })
-      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string }[];
+      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string; id: number }[];
   }, [filtered.lines, posByIdtag]);
 
   const transformerEdgeData = useMemo(() => {
@@ -180,9 +311,9 @@ const GridViewer: React.FC = () => {
         const a = posByIdtag.get(kFrom);
         const b = posByIdtag.get(kTo);
         if (!a || !b) return null;
-        return { source: a, target: b, fromKey: (t as any).bus_from_idtag, toKey: (t as any).bus_to_idtag };
+        return { source: a, target: b, fromKey: (t as any).bus_from_idtag, toKey: (t as any).bus_to_idtag, id: (t as any).id };
       })
-      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string }[];
+      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string; id: number }[];
   }, [filtered.transformers, posByIdtag]);
 
   const lineLayer = new LineLayer({
@@ -209,7 +340,7 @@ const GridViewer: React.FC = () => {
     const maxY = Math.max(...ys, 1);
     const span = Math.max(maxX - minX, maxY - minY) || 1;
     const dist = span * 0.02; // 2% of span
-    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string }> = [];
+    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string; id: number }> = [];
     const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string }> = [];
     const norm = (s?: string) => (s ?? '').trim().toLowerCase();
     for (const g of filtered.generators) {
@@ -220,7 +351,7 @@ const GridViewer: React.FC = () => {
       const h = ((g.idtag || g.name || 'g').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 12) * (Math.PI / 6);
       const gx = busPos[0] + Math.cos(h) * dist;
       const gy = busPos[1] + Math.sin(h) * dist;
-      points.push({ position: [gx, gy], name: (g as any).name || g.idtag, idtag: g.idtag, bus_idtag: (g as any).bus_idtag });
+      points.push({ position: [gx, gy], name: (g as any).name || g.idtag, idtag: g.idtag, bus_idtag: (g as any).bus_idtag, id: (g as any).id });
       edges.push({ source: [gx, gy], target: busPos, fromKey: g.idtag, toKey: (g as any).bus_idtag });
     }
     return { points, edges };
@@ -231,11 +362,13 @@ const GridViewer: React.FC = () => {
     data: genGeometry.points,
     getIcon: () => ({ url: GENERATOR_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
     getPosition: (d: any) => d.position,
-    getSize: GENERATOR_ICON_SIZE_PX,
+    getSize: () => GENERATOR_ICON_SIZE_PX * zoomMult,
     sizeUnits: 'pixels',
     sizeMinPixels: 10,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
+    parameters: { depthTest: false },
+    updateTriggers: { getSize: [zoomMult] },
   });
 
   const generatorConnectorLayer = new LineLayer({
@@ -260,7 +393,7 @@ const GridViewer: React.FC = () => {
     const maxY = Math.max(...ys, 1);
     const span = Math.max(maxX - minX, maxY - minY) || 1;
     const dist = span * 0.015; // slightly closer than generators
-    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string }> = [];
+    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string; id: number }> = [];
     const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string }> = [];
     const norm = (s?: string) => (s ?? '').trim().toLowerCase();
     for (const s of filtered.shunts) {
@@ -272,7 +405,7 @@ const GridViewer: React.FC = () => {
       const h = (base * (Math.PI / 6)) + Math.PI / 12; // 15 degrees offset from generators
       const sx = busPos[0] + Math.cos(h) * dist;
       const sy = busPos[1] + Math.sin(h) * dist;
-      points.push({ position: [sx, sy], name: (s as any).name || s.idtag, idtag: s.idtag, bus_idtag: (s as any).bus_idtag });
+      points.push({ position: [sx, sy], name: (s as any).name || s.idtag, idtag: s.idtag, bus_idtag: (s as any).bus_idtag, id: (s as any).id });
       edges.push({ source: [sx, sy], target: busPos, fromKey: s.idtag, toKey: (s as any).bus_idtag });
     }
     return { points, edges };
@@ -283,11 +416,13 @@ const GridViewer: React.FC = () => {
     data: shuntGeometry.points,
     getIcon: () => ({ url: SHUNT_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
     getPosition: (d: any) => d.position,
-    getSize: SHUNT_ICON_SIZE_PX,
+    getSize: () => SHUNT_ICON_SIZE_PX * zoomMult,
     sizeUnits: 'pixels',
     sizeMinPixels: 10,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
+    parameters: { depthTest: false },
+    updateTriggers: { getSize: [zoomMult] },
   });
 
   const shuntConnectorLayer = new LineLayer({
@@ -312,7 +447,7 @@ const GridViewer: React.FC = () => {
     const maxY = Math.max(...ys, 1);
     const span = Math.max(maxX - minX, maxY - minY) || 1;
     const dist = span * 0.018; // between shunts and generators
-    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string; p_mw?: number; q_mvar?: number }> = [];
+    const points: Array<{ position: [number, number]; id?: number; name: string; idtag: string; bus_idtag: string; p_mw?: number; q_mvar?: number }> = [];
     const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string }> = [];
     const norm = (s?: string) => (s ?? '').trim().toLowerCase();
     for (const d of filtered.loads) {
@@ -324,7 +459,7 @@ const GridViewer: React.FC = () => {
       const h = (base * (Math.PI / 6)) - Math.PI / 6; // -30 degrees shift
       const lx = busPos[0] + Math.cos(h) * dist;
       const ly = busPos[1] + Math.sin(h) * dist;
-      points.push({ position: [lx, ly], name: (d as any).name || d.idtag, idtag: d.idtag, bus_idtag: (d as any).bus_idtag, p_mw: (d as any).p_mw, q_mvar: (d as any).q_mvar });
+      points.push({ position: [lx, ly], id: (d as any).id, name: (d as any).name || d.idtag, idtag: d.idtag, bus_idtag: (d as any).bus_idtag, p_mw: (d as any).p_mw, q_mvar: (d as any).q_mvar });
       edges.push({ source: [lx, ly], target: busPos, fromKey: d.idtag, toKey: (d as any).bus_idtag });
     }
     return { points, edges };
@@ -335,11 +470,13 @@ const GridViewer: React.FC = () => {
     data: loadGeometry.points,
     getIcon: () => ({ url: LOAD_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
     getPosition: (d: any) => d.position,
-    getSize: LOAD_ICON_SIZE_PX,
+    getSize: () => LOAD_ICON_SIZE_PX * zoomMult,
     sizeUnits: 'pixels',
     sizeMinPixels: 10,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
+    parameters: { depthTest: false },
+    updateTriggers: { getSize: [zoomMult] },
   });
 
   const loadConnectorLayer = new LineLayer({
@@ -444,15 +581,15 @@ const GridViewer: React.FC = () => {
           if (lid === 'buses-layer') {
             setSelected({ kind: 'bus', data: obj });
           } else if (lid === 'lines-layer') {
-            setSelected({ kind: 'line', data: { fromKey: obj.fromKey, toKey: obj.toKey } });
+            setSelected({ kind: 'line', data: { id: obj.id, fromKey: obj.fromKey, toKey: obj.toKey } });
           } else if (lid === 'transformers-layer') {
-            setSelected({ kind: 'transformer', data: { fromKey: obj.fromKey, toKey: obj.toKey } });
+            setSelected({ kind: 'transformer', data: { id: obj.id, fromKey: obj.fromKey, toKey: obj.toKey } });
           } else if (lid === 'generators-layer') {
-            setSelected({ kind: 'generator', data: { idtag: obj.idtag, bus_idtag: obj.bus_idtag, name: obj.name } });
+            setSelected({ kind: 'generator', data: { id: obj.id, idtag: obj.idtag, bus_idtag: obj.bus_idtag, name: obj.name } });
           } else if (lid === 'loads-layer') {
-            setSelected({ kind: 'load', data: { idtag: obj.idtag, bus_idtag: obj.bus_idtag, name: obj.name, p_mw: obj.p_mw, q_mvar: obj.q_mvar } });
+            setSelected({ kind: 'load', data: { id: obj.id, idtag: obj.idtag, bus_idtag: obj.bus_idtag, name: obj.name, p_mw: obj.p_mw, q_mvar: obj.q_mvar } });
           } else if (lid === 'shunts-layer') {
-            setSelected({ kind: 'shunt', data: { idtag: obj.idtag, bus_idtag: obj.bus_idtag, name: obj.name } });
+            setSelected({ kind: 'shunt', data: { id: obj.id, idtag: obj.idtag, bus_idtag: obj.bus_idtag, name: obj.name } });
           } else {
             setSelected(null);
           }
@@ -500,7 +637,7 @@ const GridViewer: React.FC = () => {
       />
       {selected && (
         <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-          <InfoPanel selected={selected} onClose={() => setSelected(null)} busDetails={busDetails} />
+          <InfoPanel selected={selected} onClose={() => setSelected(null)} busDetails={busDetails} loadDetails={loadDetails} generatorDetails={generatorDetails} shuntDetails={shuntDetails} lineDetails={lineDetails} transformerDetails={transformerDetails} />
         </div>
       )}
       </div>
