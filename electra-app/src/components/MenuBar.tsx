@@ -3,7 +3,8 @@ import '../styles/components/MenuBar.css';
 import { useGridModel } from '../hooks/GridContext';
 import { useGridUpload } from '../hooks/useGridUpload';
 import ConfirmModal from './ConfirmModal';
-import { deleteGrid } from '../services/gridcalApi';
+import ReusableConfirmModal from './ReusableConfirmModal';
+import { deleteGrid, calculatePowerFlow } from '../services/gridcalApi';
 
 interface MenuItem {
   label: string;
@@ -23,6 +24,9 @@ const MenuBar: React.FC = () => {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);
+  const [isPowerFlowRunning, setIsPowerFlowRunning] = useState(false);
+  const [showPowerFlowConfirm, setShowPowerFlowConfirm] = useState(false);
+  const [powerFlowError, setPowerFlowError] = useState<string | null>(null);
 
   const triggerFileDialog = () => fileInputRef.current?.click();
 
@@ -60,6 +64,34 @@ const MenuBar: React.FC = () => {
     }
   };
 
+  const handlePowerFlow = async () => {
+    if (selectedGridId == null) {
+      console.log('No grid selected, selectedGridId:', selectedGridId);
+      return;
+    }
+    setShowPowerFlowConfirm(true);
+  };
+
+  const onConfirmPowerFlow = async () => {
+    setShowPowerFlowConfirm(false);
+    setOpenLabel(null);
+    try {
+      setIsPowerFlowRunning(true);
+      await calculatePowerFlow(selectedGridId!);
+      alert('Power Flow calculado correctamente.');
+    } catch (e: any) {
+      setPowerFlowError(e?.message ?? 'Failed to calculate power flow');
+      alert(`Error: ${e?.message ?? 'Failed to calculate power flow'}`);
+    } finally {
+      setIsPowerFlowRunning(false);
+    }
+  };
+
+  const onCancelPowerFlow = () => {
+    setShowPowerFlowConfirm(false);
+    setOpenLabel(null);
+  };
+
   const menuModel: MenuItem[] = [
     {
       label: 'File',
@@ -70,7 +102,16 @@ const MenuBar: React.FC = () => {
         { label: 'Close…', action: selectedGridId != null && !isUploading ? openCloseDialog : undefined, disabled: selectedGridId == null || isUploading }
       ]
     },
-    { label: 'View', items: [{ label: 'Reset Zoom (soon)', disabled: true }] },
+    { 
+      label: 'Analysis', 
+      items: [
+        { 
+          label: isPowerFlowRunning ? 'Running Power Flow...' : 'Power Flow', 
+          action: selectedGridId != null && !isPowerFlowRunning ? handlePowerFlow : undefined, 
+          disabled: selectedGridId == null || isPowerFlowRunning 
+        }
+      ] 
+    },
     { label: 'Help', items: [{ label: 'Docs (soon)', disabled: true }, { label: 'About (soon)', disabled: true }] }
   ];
 
@@ -143,7 +184,19 @@ const MenuBar: React.FC = () => {
           </div>
         ))}
       </div>
-      <ConfirmModal
+      <ReusableConfirmModal
+        isOpen={showPowerFlowConfirm}
+        title="Calcular Power Flow"
+        message="Se va a calcular el Power Flow. Esto puede tardar un poco. ¿Deseas continuar?"
+        confirmText="Sí, calcular"
+        cancelText="No"
+        onConfirm={onConfirmPowerFlow}
+        onCancel={onCancelPowerFlow}
+        isBusy={isPowerFlowRunning}
+        errorText={powerFlowError}
+        confirmColor="primary"
+      />
+      <ReusableConfirmModal
         isOpen={showCloseConfirm}
         title="Close Grid"
         message="Are you sure you want to close the Grid?"
@@ -153,6 +206,7 @@ const MenuBar: React.FC = () => {
         onCancel={() => { if (!isClosing) setShowCloseConfirm(false); }}
         isBusy={isClosing}
         errorText={closeError}
+        confirmColor="danger"
       />
     </div>
   );

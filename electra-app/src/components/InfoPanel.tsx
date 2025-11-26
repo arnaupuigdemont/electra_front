@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BusDetails, Load, Generator, Shunt, Line, Transformer2W } from '../services/gridcalApi';
+import '../styles/components/InfoPanel.css';
 
 export type SelectedItem =
   | { kind: 'bus'; data: any }
@@ -123,17 +124,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
       }
       case 'line': {
         const d = selected.data as { id?: number; fromKey: string; toKey: string };
-        const fmt = (val: any) => val != null ? val : '-';
+        const fmt = (val: any) => {
+          if (val == null) return '-';
+          if (typeof val === 'object') return 'Complex Object';
+          if (typeof val === 'number') return val.toFixed(6);
+          return val;
+        };
         const fmtBool = (val: any) => val != null ? (val ? 'Yes' : 'No') : '-';
 
         return (
           <>
-            <div style={rowStyle}><span>From</span><span style={Muted as any}>{d.fromKey}</span></div>
-            <div style={rowStyle}><span>To</span><span style={Muted as any}>{d.toKey}</span></div>
+            <div style={rowStyle}><span>From Bus</span><span style={Muted as any}>{d.fromKey || '-'}</span></div>
+            <div style={rowStyle}><span>To Bus</span><span style={Muted as any}>{d.toKey || '-'}</span></div>
+            {d.id != null && <div style={rowStyle}><span>ID</span><span style={Muted as any}>{d.id}</span></div>}
 
             {lineDetails && (
               <>
-                <div style={rowStyle}><span>ID</span><span style={Muted as any}>{fmt(lineDetails.id)}</span></div>
                 <div style={rowStyle}><span>IDTag</span><span style={Muted as any}>{fmt(lineDetails.idtag)}</span></div>
                 <div style={rowStyle}><span>Name</span><span style={Muted as any}>{fmt(lineDetails.name)}</span></div>
                 <div style={rowStyle}><span>Code</span><span style={Muted as any}>{fmt(lineDetails.code)}</span></div>
@@ -221,17 +227,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
       }
       case 'transformer': {
         const d = selected.data as { id?: number; fromKey: string; toKey: string };
-        const fmt = (val: any) => val != null ? val : '-';
+        const fmt = (val: any) => {
+          if (val == null) return '-';
+          if (typeof val === 'object') return 'Complex Object';
+          if (typeof val === 'number') return val.toFixed(6);
+          return val;
+        };
         const fmtBool = (val: any) => val != null ? (val ? 'Yes' : 'No') : '-';
 
         return (
           <>
-            <div style={rowStyle}><span>From</span><span style={Muted as any}>{d.fromKey}</span></div>
-            <div style={rowStyle}><span>To</span><span style={Muted as any}>{d.toKey}</span></div>
+            <div style={rowStyle}><span>From Bus</span><span style={Muted as any}>{d.fromKey || '-'}</span></div>
+            <div style={rowStyle}><span>To Bus</span><span style={Muted as any}>{d.toKey || '-'}</span></div>
+            {d.id != null && <div style={rowStyle}><span>ID</span><span style={Muted as any}>{d.id}</span></div>}
 
             {transformerDetails && (
               <>
-                <div style={rowStyle}><span>ID</span><span style={Muted as any}>{fmt(transformerDetails.id)}</span></div>
                 <div style={rowStyle}><span>IDTag</span><span style={Muted as any}>{fmt(transformerDetails.idtag)}</span></div>
                 <div style={rowStyle}><span>Name</span><span style={Muted as any}>{fmt(transformerDetails.name)}</span></div>
                 <div style={rowStyle}><span>Code</span><span style={Muted as any}>{fmt(transformerDetails.code)}</span></div>
@@ -354,7 +365,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
       }
       case 'generator': {
         const g = selected.data as any;
-        const fmt = (val: any) => val != null ? val : '-';
+        const fmt = (val: any) => {
+          if (val == null) return '-';
+          if (typeof val === 'object') return 'Complex Object';
+          if (typeof val === 'number') return val.toFixed(6);
+          return val;
+        };
         const fmtBool = (val: any) => val != null ? (val ? 'Yes' : 'No') : '-';
 
         return (
@@ -443,7 +459,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
             
             {loadDetails && (
               <>
-                {loadDetails.id != null && <div style={rowStyle}><span>ID</span><span style={Muted as any}>{loadDetails.id}</span></div>}
                 {loadDetails.code && <div style={rowStyle}><span>Code</span><span style={Muted as any}>{loadDetails.code}</span></div>}
                 {loadDetails.rdfid && <div style={rowStyle}><span>RDF ID</span><span style={Muted as any} title={loadDetails.rdfid}>{loadDetails.rdfid.slice(0, 12)}...</span></div>}
                 
@@ -574,7 +589,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
       }
       case 'shunt': {
         const s = selected.data as any;
-        const fmt = (val: any) => val != null ? val : '-';
+        const fmt = (val: any) => {
+          if (val == null) return '-';
+          if (typeof val === 'object') return 'Complex Object';
+          if (typeof val === 'number') return val.toFixed(6);
+          return val;
+        };
         const fmtBool = (val: any) => val != null ? (val ? 'Yes' : 'No') : '-';
 
         return (
@@ -584,7 +604,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
             
             {shuntDetails && (
               <>
-                <div style={rowStyle}><span>ID</span><span style={Muted as any}>{fmt(shuntDetails.id)}</span></div>
                 <div style={rowStyle}><span>Code</span><span style={Muted as any}>{fmt(shuntDetails.code)}</span></div>
 
                 <div style={Divider} />
@@ -662,7 +681,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
   };
 
   return (
-    <aside style={Box}>
+    <aside style={{
+      ...Box,
+      maxHeight: 'calc(100vh - 64px)',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={Title}>
           {selected.kind.charAt(0).toUpperCase() + selected.kind.slice(1)}
@@ -670,7 +695,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 18 }}>×</button>
       </div>
       <div style={Divider} />
-      {renderContent()}
+      <div className="info-panel-scroll">
+        {renderContent()}
+      </div>
     </aside>
   );
 };

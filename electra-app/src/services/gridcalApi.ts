@@ -537,3 +537,12 @@ export async function deleteGrid(grid_id: number): Promise<{ deleted: boolean; g
   }
   return resp.json();
 }
+
+export async function calculatePowerFlow(grid_id: number): Promise<any> {
+  const resp = await fetch(`${BASE_URL}/grid/${grid_id}/power-flow`);
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text || `Failed to calculate power flow (${resp.status})`);
+  }
+  return resp.json();
+}

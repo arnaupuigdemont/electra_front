@@ -1,0 +1,32 @@
+.info-panel-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  padding-right: 12px;
+  margin-right: 4px;
+}
+
+/* Custom minimal scrollbar */
+.info-panel-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.info-panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.info-panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.info-panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Firefox */
+.info-panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}

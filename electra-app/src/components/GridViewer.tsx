@@ -4,13 +4,16 @@ import { OrthographicView } from '@deck.gl/core';
 import { LineLayer } from '@deck.gl/layers';
 import * as DeckLayers from '@deck.gl/layers';
 import { listBuses, listLines, listTransformers2w, listGenerators, listShunts, listLoads, getBus, getLoad, getGenerator, getShunt, getLine, getTransformer2W } from '../services/gridcalApi';
-import busIconUrl from '../assets/bus_image.png';
-import generatorIconUrl from '../assets/generator_image.png';
-import loadIconUrl from '../assets/load_image.png';
-import shuntIconUrl from '../assets/shunt_image.png';
 import type { Bus, Line, Transformer2W, Generator, Shunt, Load, BusDetails } from '../services/gridcalApi';
 import InfoPanel, { type SelectedItem } from './InfoPanel';
 import { useGridModel } from '../hooks/GridContext';
+import ElectricLoader from './ElectricLoader';
+import BusIcon from './grid-elements/BusIcon';
+import GeneratorIcon from './grid-elements/GeneratorIcon';
+import LoadIcon from './grid-elements/LoadIcon';
+import ShuntIcon from './grid-elements/ShuntIcon';
+import TransformerIcon from './grid-elements/TransformerIcon';
+import { svgToDataUrl } from '../utils/svgToDataUrl';
 
 type ViewState = {
   target: [number, number, number];
@@ -44,10 +47,12 @@ const GridViewer: React.FC = () => {
   const [lineDetailsCache, setLineDetailsCache] = useState<Record<number, Line>>({});
   const [transformerDetails, setTransformerDetails] = useState<Transformer2W | null>(null);
   const [transformerDetailsCache, setTransformerDetailsCache] = useState<Record<number, Transformer2W>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (selectedGridId == null) return;
     (async () => {
+      setIsLoading(true);
       try {
         const [bs, ls, ts, gs, ss, ld] = await Promise.all([
           listBuses(),
@@ -65,6 +70,8 @@ const GridViewer: React.FC = () => {
         setLoads(ld);
       } catch (e: any) {
         setError(e?.message || 'Failed to load grid data');
+      } finally {
+        setIsLoading(false);
       }
     })();
   }, [selectedGridId]);
@@ -161,7 +168,11 @@ const GridViewer: React.FC = () => {
       if (!selected || selected.kind !== 'line') { setLineDetails(null); return; }
       const lineData = selected.data as any;
       const lineId = lineData?.id;
-      if (lineId == null) { setLineDetails(null); return; }
+      if (lineId == null || typeof lineId !== 'number') { 
+        console.warn('Line selected without valid id:', lineData);
+        setLineDetails(null); 
+        return; 
+      }
       const cached = lineDetailsCache[lineId];
       if (cached) { setLineDetails(cached); return; }
       try {
@@ -169,6 +180,7 @@ const GridViewer: React.FC = () => {
         setLineDetails(det);
         setLineDetailsCache(prev => ({ ...prev, [lineId]: det }));
       } catch (e) {
+        console.error('Failed to load line details:', e);
         // ignore; panel will show base fields only
       }
     };
@@ -225,16 +237,20 @@ const GridViewer: React.FC = () => {
     setViewState(v => ({ ...v, target: [cx, cy, 0], zoom }));
   }, [filtered.buses]);
 
-  const BUS_ICON_URL = busIconUrl as unknown as string;
+  // Convert SVG components to data URLs
+  const BUS_ICON_URL = useMemo(() => svgToDataUrl(<BusIcon size={64} />), []);
+  const GENERATOR_ICON_URL = useMemo(() => svgToDataUrl(<GeneratorIcon size={64} />), []);
+  const LOAD_ICON_URL = useMemo(() => svgToDataUrl(<LoadIcon size={64} />), []);
+  const SHUNT_ICON_URL = useMemo(() => svgToDataUrl(<ShuntIcon size={64} />), []);
+  const TRANSFORMER_ICON_URL = useMemo(() => svgToDataUrl(<TransformerIcon size={64} />), []);
+
   // Base sizes (scaled later by zoomMult)
-  const BUS_ICON_SIZE_PX = 48;
-  const BUS_TEXT_SIZE_PX = 12;
-  const LOAD_ICON_URL = loadIconUrl as unknown as string;
-  const LOAD_ICON_SIZE_PX = 30;
-  const GENERATOR_ICON_URL = generatorIconUrl as unknown as string;
-  const GENERATOR_ICON_SIZE_PX = 30;
-  const SHUNT_ICON_URL = shuntIconUrl as unknown as string;
-  const SHUNT_ICON_SIZE_PX = 30;
+  const BUS_ICON_SIZE_PX = 72;
+  const BUS_TEXT_SIZE_PX = 14;
+  const LOAD_ICON_SIZE_PX = 50;
+  const GENERATOR_ICON_SIZE_PX = 50;
+  const SHUNT_ICON_SIZE_PX = 50;
+  const TRANSFORMER_ICON_SIZE_PX = 50;
 
   // Zoom-based multiplier (clamped) to scale icons & labels
   const zoomMult = useMemo(() => {
@@ -321,7 +337,7 @@ const GridViewer: React.FC = () => {
     data: edgeData,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [29, 160, 239, 220], // brighter blue
+    getColor: [255, 255, 255, 220],
     getWidth: 3,
     widthUnits: 'pixels',
     pickable: true,
@@ -376,7 +392,7 @@ const GridViewer: React.FC = () => {
     data: genGeometry.edges,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [236, 72, 153, 180],
+    getColor: [255, 255, 255, 180],
     getWidth: 2,
     widthUnits: 'pixels',
     pickable: false,
@@ -430,7 +446,7 @@ const GridViewer: React.FC = () => {
     data: shuntGeometry.edges,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [34, 211, 238, 180],
+    getColor: [255, 255, 255, 180],
     getWidth: 2,
     widthUnits: 'pixels',
     pickable: false,
@@ -484,7 +500,7 @@ const GridViewer: React.FC = () => {
     data: loadGeometry.edges,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [168, 85, 247, 180],
+    getColor: [255, 255, 255, 180],
     getWidth: 2,
     widthUnits: 'pixels',
     pickable: false,
@@ -496,11 +512,34 @@ const GridViewer: React.FC = () => {
     data: transformerEdgeData,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [255, 196, 0, 230], // amber/yellow
-    getWidth: 4,
+    getColor: [255, 255, 255, 230],
+    getWidth: 3,
     widthUnits: 'pixels',
     pickable: true,
     parameters: { depthTest: false },
+  });
+
+  // Transformer icons at the midpoint of each transformer line
+  const transformerIconData = useMemo(() => {
+    return transformerEdgeData.map(edge => {
+      const midX = (edge.source[0] + edge.target[0]) / 2;
+      const midY = (edge.source[1] + edge.target[1]) / 2;
+      return { position: [midX, midY], id: edge.id, fromKey: edge.fromKey, toKey: edge.toKey };
+    });
+  }, [transformerEdgeData]);
+
+  const transformerIconLayer = new (DeckLayers as any).IconLayer({
+    id: 'transformer-icons-layer',
+    data: transformerIconData,
+    getIcon: () => ({ url: TRANSFORMER_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
+    getPosition: (d: any) => d.position,
+    getSize: () => TRANSFORMER_ICON_SIZE_PX * zoomMult,
+    sizeUnits: 'pixels',
+    sizeMinPixels: 12,
+    pickable: true,
+    loadOptions: { image: { crossOrigin: 'anonymous' } },
+    parameters: { depthTest: false },
+    updateTriggers: { getSize: [zoomMult] },
   });
 
   const matchStats = useMemo(() => {
@@ -530,44 +569,16 @@ const GridViewer: React.FC = () => {
     );
   }
 
-  return (
-    <div className="grid-viewer" style={{ width: '94%', margin: '0 auto' }}>
-      <div className="grid-viewer-toolbar">
-        <span>Grid ID: {selectedGridId}</span>
-        <span style={{ marginLeft: 12, opacity: 0.8 }}>Lines: {matchStats.matchedLines}/{matchStats.totalLines}</span>
-        {matchStats.unmatchedLines > 0 && (
-          <span style={{ marginLeft: 8, color: '#fca5a5' }}>
-            Unmatched: {matchStats.unmatchedLines}
-          </span>
-        )}
-        <span style={{ marginLeft: 16, opacity: 0.8 }}>Transformers: {matchStats.matchedTx}/{matchStats.totalTx}</span>
-        {matchStats.unmatchedTx > 0 && (
-          <span style={{ marginLeft: 8, color: '#fca5a5' }}>
-            Unmatched: {matchStats.unmatchedTx}
-          </span>
-        )}
-        <span style={{ marginLeft: 16, opacity: 0.8 }}>Generators: {matchStats.matchedGen}/{matchStats.totalGen}</span>
-        {matchStats.unmatchedGen > 0 && (
-          <span style={{ marginLeft: 8, color: '#fca5a5' }}>
-            Unmatched: {matchStats.unmatchedGen}
-          </span>
-        )}
-        <span style={{ marginLeft: 16, opacity: 0.8 }}>Shunts: {matchStats.matchedSh}/{matchStats.totalSh}</span>
-        {matchStats.unmatchedSh > 0 && (
-          <span style={{ marginLeft: 8, color: '#fca5a5' }}>
-            Unmatched: {matchStats.unmatchedSh}
-          </span>
-        )}
-        <span style={{ marginLeft: 16, opacity: 0.8 }}>Loads: {matchStats.matchedLd}/{matchStats.totalLd}</span>
-        {matchStats.unmatchedLd > 0 && (
-          <span style={{ marginLeft: 8, color: '#fca5a5' }}>
-            Unmatched: {matchStats.unmatchedLd}
-          </span>
-        )}
-        {error && <span className="grid-viewer-error">{error}</span>}
+  if (isLoading) {
+    return (
+      <div className="grid-viewer" style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+        <ElectricLoader message="Loading grid data..." />
       </div>
-      
-      <div style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
+    );
+  }
+
+  return (
+    <div className="grid-viewer" style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
       <DeckGL
         views={new OrthographicView({ id: 'ortho' })}
         viewState={viewState as any}
@@ -582,7 +593,7 @@ const GridViewer: React.FC = () => {
             setSelected({ kind: 'bus', data: obj });
           } else if (lid === 'lines-layer') {
             setSelected({ kind: 'line', data: { id: obj.id, fromKey: obj.fromKey, toKey: obj.toKey } });
-          } else if (lid === 'transformers-layer') {
+          } else if (lid === 'transformers-layer' || lid === 'transformer-icons-layer') {
             setSelected({ kind: 'transformer', data: { id: obj.id, fromKey: obj.fromKey, toKey: obj.toKey } });
           } else if (lid === 'generators-layer') {
             setSelected({ kind: 'generator', data: { id: obj.id, idtag: obj.idtag, bus_idtag: obj.bus_idtag, name: obj.name } });
@@ -594,7 +605,7 @@ const GridViewer: React.FC = () => {
             setSelected(null);
           }
         }}
-  layers={[lineLayer, transformerLayer, generatorConnectorLayer, generatorLayer, shuntConnectorLayer, shuntLayer, loadConnectorLayer, loadLayer, busIconLayer, busNameLayer]}
+  layers={[lineLayer, transformerLayer, transformerIconLayer, generatorConnectorLayer, generatorLayer, shuntConnectorLayer, shuntLayer, loadConnectorLayer, loadLayer, busIconLayer, busNameLayer]}
         getTooltip={({object, layer}: any) => {
           if (!object) return null;
           if (layer && layer.id === 'buses-layer') {
@@ -606,6 +617,10 @@ const GridViewer: React.FC = () => {
             return { text: `${o.fromKey} → ${o.toKey}` };
           }
           if (layer && layer.id === 'transformers-layer') {
+            const o = object as any;
+            return { text: `Tx: ${o.fromKey} → ${o.toKey}` };
+          }
+          if (layer && layer.id === 'transformer-icons-layer') {
             const o = object as any;
             return { text: `Tx: ${o.fromKey} → ${o.toKey}` };
           }
@@ -626,21 +641,25 @@ const GridViewer: React.FC = () => {
           return null;
         }}
         style={{
-          position: 'relative',
-          flex: selected ? '1 1 auto' : '1 1 100%',
-          height: '80vh',
-          border: '1px solid #334155',
-          borderRadius: 16,      // rounder corners
-          overflow: 'hidden',    // clip contents to rounded corners
-          background: '#0b1220'  // match InfoPanel background
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          top: 0,
+          left: 0,
+          background: '#0b1220'
         }}
       />
       {selected && (
-        <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+        <div style={{ 
+          position: 'absolute', 
+          top: 16, 
+          right: 16, 
+          zIndex: 1000,
+          maxHeight: 'calc(100vh - 64px)'
+        }}>
           <InfoPanel selected={selected} onClose={() => setSelected(null)} busDetails={busDetails} loadDetails={loadDetails} generatorDetails={generatorDetails} shuntDetails={shuntDetails} lineDetails={lineDetails} transformerDetails={transformerDetails} />
         </div>
       )}
-      </div>
     </div>
   );
 };
