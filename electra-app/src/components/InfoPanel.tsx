@@ -33,7 +33,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
     background: '#0b1220',
     color: '#e5e7eb',
     border: '1px solid #334155',
-    borderRadius: 16,
+    borderRadius: 0,
     padding: 16,
     boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
   };
@@ -683,7 +683,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
   return (
     <aside style={{
       ...Box,
-      maxHeight: 'calc(100vh - 64px)',
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden'

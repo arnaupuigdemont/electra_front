@@ -433,7 +433,10 @@ export interface Load {
   q_mvar?: number;
 }
 
-const BASE_URL = 'http://127.0.0.1:8000';
+// Read base URL from Vite environment variable `VITE_API_BASE_URL` if present,
+// otherwise fall back to localhost. Set `VITE_API_BASE_URL` to e.g. http://localhost:8000
+// in `electra_front/electra-app/.env` or the environment running the dev server.
+const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export async function uploadGridFile(file: File): Promise<UploadResult> {
   const formData = new FormData();
@@ -538,7 +541,28 @@ export async function deleteGrid(grid_id: number): Promise<{ deleted: boolean; g
   return resp.json();
 }
 
-export async function calculatePowerFlow(grid_id: number): Promise<any> {
+export interface PowerFlowResults {
+  grid_name: string;
+  converged: boolean;
+  error: number;
+  bus_results: Array<{
+    Vm: number;
+    Va: number;
+    P: number;
+    Q: number;
+  }>;
+  branch_results: Array<{
+    Pf: number;
+    Qf: number;
+    Pt: number;
+    Qt: number;
+    loading: number;
+    Ploss: number;
+    Qloss: number;
+  }>;
+}
+
+export async function calculatePowerFlow(grid_id: number): Promise<PowerFlowResults> {
   const resp = await fetch(`${BASE_URL}/grid/${grid_id}/power-flow`);
   if (!resp.ok) {
     const text = await resp.text();

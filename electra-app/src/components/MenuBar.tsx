@@ -19,7 +19,7 @@ const MenuBar: React.FC = () => {
   // Track which menu label is open so we can render left/right groups independently
   const [openLabel, setOpenLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { selectedGridId, setSelectedGridId } = useGridModel();
+  const { selectedGridId, setSelectedGridId, setPowerFlowResults, setIsPowerFlowCalculating } = useGridModel();
   const { upload, isUploading, error } = useGridUpload((res) => setSelectedGridId(res.grid_id));
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -77,13 +77,15 @@ const MenuBar: React.FC = () => {
     setOpenLabel(null);
     try {
       setIsPowerFlowRunning(true);
-      await calculatePowerFlow(selectedGridId!);
-      alert('Power Flow calculado correctamente.');
+      setIsPowerFlowCalculating(true);
+      const results = await calculatePowerFlow(selectedGridId!);
+      setPowerFlowResults(results);
     } catch (e: any) {
       setPowerFlowError(e?.message ?? 'Failed to calculate power flow');
       alert(`Error: ${e?.message ?? 'Failed to calculate power flow'}`);
     } finally {
       setIsPowerFlowRunning(false);
+      setIsPowerFlowCalculating(false);
     }
   };
 

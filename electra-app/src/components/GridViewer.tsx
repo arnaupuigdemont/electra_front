@@ -8,12 +8,16 @@ import type { Bus, Line, Transformer2W, Generator, Shunt, Load, BusDetails } fro
 import InfoPanel, { type SelectedItem } from './InfoPanel';
 import { useGridModel } from '../hooks/GridContext';
 import ElectricLoader from './ElectricLoader';
+import CalculatorLoader from './CalculatorLoader';
+import PowerFlowPanel from './PowerFlowPanel';
 import BusIcon from './grid-elements/BusIcon';
 import GeneratorIcon from './grid-elements/GeneratorIcon';
 import LoadIcon from './grid-elements/LoadIcon';
 import ShuntIcon from './grid-elements/ShuntIcon';
 import TransformerIcon from './grid-elements/TransformerIcon';
 import { svgToDataUrl } from '../utils/svgToDataUrl';
+
+import { processBusResults, processBranchResults } from '../utils/powerFlowProcessor';
 
 type ViewState = {
   target: [number, number, number];
@@ -48,6 +52,98 @@ const GridViewer: React.FC = () => {
   const [transformerDetails, setTransformerDetails] = useState<Transformer2W | null>(null);
   const [transformerDetailsCache, setTransformerDetailsCache] = useState<Record<number, Transformer2W>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const { powerFlowResults, isPowerFlowCalculating } = useGridModel();
+  // Ordered lists of IDs for mapping power flow results (index 0 = bus 1, index 1 = bus 2, etc.)
+  const [orderedBusIds, setOrderedBusIds] = useState<number[]>([]);
+  const [orderedLineIds, setOrderedLineIds] = useState<number[]>([]);
+
+  // Handle panel close with slide-out animation
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setSelected(null);
+      setIsClosing(false);
+    }, 300); // Match animation duration
+  };
+
+  // Get position of selected element
+  const getElementPosition = (obj: any, layerId: string): [number, number] | null => {
+    if (layerId === 'buses-layer') {
+      return [obj.x, obj.y];
+    } else if (layerId === 'lines-layer') {
+      if (obj.source && obj.target) {
+        const midX = (obj.source[0] + obj.target[0]) / 2;
+        const midY = (obj.source[1] + obj.target[1]) / 2;
+        return [midX, midY];
+      }
+    } else if (layerId === 'transformers-layer' || layerId === 'transformer-icons-layer') {
+      if (obj.source && obj.target) {
+        const midX = (obj.source[0] + obj.target[0]) / 2;
+        const midY = (obj.source[1] + obj.target[1]) / 2;
+        return [midX, midY];
+      }
+      // If source/target not available, find transformer and get bus positions
+      if (obj.id != null) {
+        const transformer = transformers.find(t => t.id === obj.id);
+        if (transformer) {
+          const busFrom = buses.find(b => b.idtag === transformer.bus_from_idtag);
+          const busTo = buses.find(b => b.idtag === transformer.bus_to_idtag);
+          if (busFrom && busTo) {
+            const midX = (busFrom.x + busTo.x) / 2;
+            const midY = (busFrom.y + busTo.y) / 2;
+            return [midX, midY];
+          }
+        }
+      }
+    } else if (layerId === 'generators-layer' || layerId === 'loads-layer' || layerId === 'shunts-layer') {
+      const bus = buses.find(b => b.idtag === obj.bus_idtag);
+      return bus ? [bus.x, bus.y] : null;
+    }
+    return null;
+  };
+
+  // Smooth zoom to element
+  const zoomToElement = (position: [number, number]) => {
+    const currentZoom = viewState.zoom;
+    const MIN_ZOOM_LEVEL = 0.5; // Target zoom level
+    
+    // Always zoom if current zoom is below threshold
+    if (currentZoom < MIN_ZOOM_LEVEL) {
+      // Zoom in to minimum level
+      setViewState({
+        target: [position[0], position[1], 0],
+        zoom: MIN_ZOOM_LEVEL,
+        transitionDuration: 500
+      } as any);
+    } else {
+      // Already at good zoom level: just center without zooming
+      setViewState({
+        target: [position[0], position[1], 0],
+        zoom: currentZoom,
+        transitionDuration: 500
+      } as any);
+    }
+  };
+
+  // Get power flow result for selected element
+  const selectedPowerFlowResult = useMemo(() => {
+    if (!selected || !powerFlowResults) return null;
+    
+    if (selected.kind === 'bus' && selected.data.id != null) {
+      const index = orderedBusIds.indexOf(selected.data.id);
+      if (index >= 0 && index < powerFlowResults.bus_results.length) {
+        return { kind: 'bus' as const, result: powerFlowResults.bus_results[index] };
+      }
+    } else if ((selected.kind === 'line' || selected.kind === 'transformer') && selected.data.id != null) {
+      const index = orderedLineIds.indexOf(selected.data.id);
+      if (index >= 0 && index < powerFlowResults.branch_results.length) {
+        return { kind: selected.kind, result: powerFlowResults.branch_results[index] };
+      }
+    }
+    
+    return null;
+  }, [selected, powerFlowResults, orderedBusIds, orderedLineIds]);
 
   useEffect(() => {
     if (selectedGridId == null) return;
@@ -68,6 +164,23 @@ const GridViewer: React.FC = () => {
         setGenerators(gs);
         setShunts(ss);
         setLoads(ld);
+        // Create ordered ID lists for power flow result mapping
+        // Power flow results come in order: index 0 = bus 1, index 1 = bus 2, etc.
+        // IMPORTANT: Filter by selectedGridId first to match the grid being calculated
+        const gridBuses = bs.filter(b => b.grid_id === selectedGridId);
+        const gridLines = ls.filter(l => l.grid_id === selectedGridId);
+        const gridTransformers = ts.filter(t => t.grid_id === selectedGridId);
+        
+        const sortedBusIds = [...gridBuses].sort((a, b) => a.id - b.id).map(b => b.id);
+        
+        // Branch results include both lines and transformers (in that order)
+        const sortedLineIds = [...gridLines].sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).map(l => l.id).filter((id): id is number => id != null);
+        const sortedTransformerIds = [...gridTransformers].sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).map(t => t.id).filter((id): id is number => id != null);
+        const sortedBranchIds = [...sortedLineIds, ...sortedTransformerIds];
+        
+        setOrderedBusIds(sortedBusIds);
+        setOrderedLineIds(sortedBranchIds);
+        console.log(`Grid ${selectedGridId}: Created ordered lists - ${sortedBusIds.length} buses, ${sortedLineIds.length} lines, ${sortedTransformerIds.length} transformers, ${sortedBranchIds.length} total branches`);
       } catch (e: any) {
         setError(e?.message || 'Failed to load grid data');
       } finally {
@@ -161,6 +274,56 @@ const GridViewer: React.FC = () => {
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
+
+  // Create color maps from power flow results
+  // Power flow results are ordered: index 0 = bus 1, index 1 = bus 2, etc.
+  // We use the orderedBusIds and orderedLineIds lists to map directly
+  const busColorMap = useMemo(() => {
+    if (!powerFlowResults?.bus_results || orderedBusIds.length === 0) {
+      return new Map<number, [number, number, number]>();
+    }
+    const coloredBuses = processBusResults(powerFlowResults.bus_results);
+    const map = new Map<number, [number, number, number]>();
+    console.log('Creating bus color map:', {
+      numResults: coloredBuses.length,
+      numBusIds: orderedBusIds.length,
+      firstBusId: orderedBusIds[0],
+      firstColor: coloredBuses[0]?.color
+    });
+    orderedBusIds.forEach((busId, index) => {
+      if (index < coloredBuses.length) {
+        map.set(busId, coloredBuses[index].color);
+      }
+    });
+    console.log('Bus color map size:', map.size, 'First 3 entries:', 
+      Array.from(map.entries()).slice(0, 3).map(([id, color]) => ({ id, color })));
+    return map;
+  }, [powerFlowResults, orderedBusIds]);
+
+  const branchColorMap = useMemo(() => {
+    if (!powerFlowResults?.branch_results || orderedLineIds.length === 0) {
+      return new Map<number, [number, number, number]>();
+    }
+    const coloredBranches = processBranchResults(powerFlowResults.branch_results);
+    const map = new Map<number, [number, number, number]>();
+    console.log('Creating branch color map:', {
+      numResults: coloredBranches.length,
+      numBranchIds: orderedLineIds.length,
+      firstBranchId: orderedLineIds[0],
+      lastBranchId: orderedLineIds[orderedLineIds.length - 1],
+      firstColor: coloredBranches[0]?.color
+    });
+    orderedLineIds.forEach((lineId, index) => {
+      if (index < coloredBranches.length) {
+        map.set(lineId, coloredBranches[index].color);
+      }
+    });
+    console.log('Branch color map size:', map.size, 'First 3 entries:', 
+      Array.from(map.entries()).slice(0, 3).map(([id, color]) => ({ id, color })),
+      'Last 3 entries:',
+      Array.from(map.entries()).slice(-3).map(([id, color]) => ({ id, color })));
+    return map;
+  }, [powerFlowResults, orderedLineIds]);
 
   // Fetch extra line details when a line is selected
   useEffect(() => {
@@ -262,16 +425,20 @@ const GridViewer: React.FC = () => {
   const busIconLayer = new (DeckLayers as any).IconLayer({
     id: 'buses-layer',
     data: filtered.buses,
-    // Center the icon exactly at the bus coordinates and render original pixels (no masking)
-    getIcon: () => ({ url: BUS_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
+    // Use mask: true to enable color tinting based on power flow results
+    getIcon: () => ({ url: BUS_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: true }),
     getPosition: (d: Bus) => [d.x, d.y],
     getSize: () => BUS_ICON_SIZE_PX * zoomMult,
+    getColor: (d: Bus) => {
+      const color = busColorMap.get(d.id);
+      return color ? [...color, 255] : [255, 255, 255, 255];
+    },
     sizeUnits: 'pixels',
     sizeMinPixels: 12,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
     parameters: { depthTest: false },
-    updateTriggers: { getSize: [zoomMult] },
+    updateTriggers: { getSize: [zoomMult], getColor: [busColorMap] },
   });
 
   const busNameLayer = new (DeckLayers as any).TextLayer({
@@ -337,11 +504,15 @@ const GridViewer: React.FC = () => {
     data: edgeData,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [255, 255, 255, 220],
+    getColor: (d: any) => {
+      const color = branchColorMap.get(d.id);
+      return color ? [...color, 220] : [255, 255, 255, 220];
+    },
     getWidth: 3,
     widthUnits: 'pixels',
     pickable: true,
     parameters: { depthTest: false },
+    updateTriggers: { getColor: [branchColorMap] },
   });
 
   // Generators: compute node positions with slight offset from their host bus and a connector line
@@ -512,11 +683,15 @@ const GridViewer: React.FC = () => {
     data: transformerEdgeData,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [255, 255, 255, 230],
+    getColor: (d: any) => {
+      const color = branchColorMap.get(d.id);
+      return color ? [...color, 230] : [255, 255, 255, 230];
+    },
     getWidth: 3,
     widthUnits: 'pixels',
     pickable: true,
     parameters: { depthTest: false },
+    updateTriggers: { getColor: [branchColorMap] },
   });
 
   // Transformer icons at the midpoint of each transformer line
@@ -563,7 +738,15 @@ const GridViewer: React.FC = () => {
 
   if (selectedGridId == null) {
     return (
-      <div className="grid-viewer" style={{ color: '#cbd5e1', textAlign: 'center' }}>
+      <div className="grid-viewer" style={{ 
+        color: '#cbd5e1', 
+        textAlign: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        width: '100%'
+      }}>
         Upload a grid (File → Open) to visualize it.
       </div>
     );
@@ -572,7 +755,15 @@ const GridViewer: React.FC = () => {
   if (isLoading) {
     return (
       <div className="grid-viewer" style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-        <ElectricLoader message="Loading grid data..." />
+        <ElectricLoader />
+      </div>
+    );
+  }
+
+  if (isPowerFlowCalculating) {
+    return (
+      <div className="grid-viewer" style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+        <CalculatorLoader />
       </div>
     );
   }
@@ -589,6 +780,13 @@ const GridViewer: React.FC = () => {
           if (!info || !info.object || !info.layer) { setSelected(null); return; }
           const lid = info.layer.id as string;
           const obj = info.object;
+          
+          // Get position and zoom to element
+          const position = getElementPosition(obj, lid);
+          if (position) {
+            zoomToElement(position);
+          }
+          
           if (lid === 'buses-layer') {
             setSelected({ kind: 'bus', data: obj });
           } else if (lid === 'lines-layer') {
@@ -650,14 +848,31 @@ const GridViewer: React.FC = () => {
         }}
       />
       {selected && (
-        <div style={{ 
-          position: 'absolute', 
-          top: 16, 
-          right: 16, 
-          zIndex: 1000,
-          maxHeight: 'calc(100vh - 64px)'
-        }}>
-          <InfoPanel selected={selected} onClose={() => setSelected(null)} busDetails={busDetails} loadDetails={loadDetails} generatorDetails={generatorDetails} shuntDetails={shuntDetails} lineDetails={lineDetails} transformerDetails={transformerDetails} />
+        <div 
+          className="panel-container"
+          style={{ 
+            position: 'absolute', 
+            top: 0, 
+            right: 0, 
+            bottom: 0,
+            zIndex: 1000,
+            width: '352px',
+            display: 'flex',
+            flexDirection: 'column',
+            animation: isClosing ? 'slideOutToRight 0.3s ease-in forwards' : 'slideInFromRight 0.3s ease-out'
+          }}>
+          <div style={{ flex: selectedPowerFlowResult ? '1' : '1', minHeight: 0 }}>
+            <InfoPanel selected={selected} onClose={handleClose} busDetails={busDetails} loadDetails={loadDetails} generatorDetails={generatorDetails} shuntDetails={shuntDetails} lineDetails={lineDetails} transformerDetails={transformerDetails} />
+          </div>
+          {selectedPowerFlowResult && (
+            <div style={{ flexShrink: 0 }}>
+              <PowerFlowPanel 
+                kind={selectedPowerFlowResult.kind} 
+                elementId={selected.data.id} 
+                result={selectedPowerFlowResult.result} 
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
