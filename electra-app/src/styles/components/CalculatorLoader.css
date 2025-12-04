@@ -1,0 +1,40 @@
+.calculator-loader-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.display-numbers {
+  font-family: 'Courier New', monospace;
+  font-size: 32px;
+  font-weight: bold;
+  color: #00ffdd;
+  letter-spacing: 4px;
+  text-shadow: 
+    0 0 10px rgba(0, 255, 221, 0.8),
+    0 0 20px rgba(0, 255, 221, 0.5),
+    0 0 30px rgba(0, 255, 221, 0.3);
+  animation: numberGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes numberGlow {
+  0%, 100% {
+    text-shadow: 
+      0 0 10px rgba(0, 255, 221, 0.8),
+      0 0 20px rgba(0, 255, 221, 0.5),
+      0 0 30px rgba(0, 255, 221, 0.3);
+  }
+  50% {
+    text-shadow: 
+      0 0 15px rgba(0, 255, 221, 1),
+      0 0 30px rgba(0, 255, 221, 0.7),
+      0 0 45px rgba(0, 255, 221, 0.5),
+      0 0 60px rgba(0, 255, 221, 0.3);
+  }
+}

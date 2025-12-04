@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@deck.gl/core": "^8.9.36",
+    "@deck.gl/layers": "^8.9.36",
+    "@deck.gl/react": "^8.9.36",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

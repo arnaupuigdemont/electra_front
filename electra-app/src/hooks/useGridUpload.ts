@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { uploadGridFile, type GridModel } from '../services/gridcalApi';
+import { uploadGridFile, type UploadResult } from '../services/gridcalApi';
 
-export function useGridUpload(onSuccess?: (m: GridModel) => void) {
+export function useGridUpload(onSuccess?: (r: UploadResult) => void) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -9,9 +9,9 @@ export function useGridUpload(onSuccess?: (m: GridModel) => void) {
     setIsUploading(true);
     setError(null);
     try {
-      const model = await uploadGridFile(file);
-      onSuccess && onSuccess(model);
-      return model;
+      const res = await uploadGridFile(file);
+      onSuccess && onSuccess(res);
+      return res;
     } catch (e: any) {
       setError(e.message || 'Upload error');
       throw e;

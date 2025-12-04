@@ -1,0 +1,38 @@
+.electric-loader-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.ecg-line {
+  width: 600px;
+  height: 120px;
+}
+
+.ecg-pulse {
+  stroke: url(#lineGradient);
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(120, 180, 255, 0.8)) drop-shadow(0 0 16px rgba(255, 220, 100, 0.4));
+  animation: ecgPulse 2s ease-in-out infinite;
+}
+
+@keyframes ecgPulse {
+  0% {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.3;
+  }
+}
