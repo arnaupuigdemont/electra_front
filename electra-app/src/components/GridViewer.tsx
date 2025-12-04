@@ -37,7 +37,7 @@ const GridViewer: React.FC = () => {
   const [shunts, setShunts] = useState<Shunt[]>([]);
   const [loads, setLoads] = useState<Load[]>([]);
   const [viewState, setViewState] = useState<ViewState>(initialView);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [busDetails, setBusDetails] = useState<BusDetails | null>(null);
   const [busDetailsCache, setBusDetailsCache] = useState<Record<number, BusDetails>>({});
@@ -717,24 +717,24 @@ const GridViewer: React.FC = () => {
     updateTriggers: { getSize: [zoomMult] },
   });
 
-  const matchStats = useMemo(() => {
-    const totalLines = filtered.lines.length;
-    const matchedLines = edgeData.length;
-    const unmatchedLines = totalLines - matchedLines;
-    const totalTx = filtered.transformers.length;
-    const matchedTx = transformerEdgeData.length;
-    const unmatchedTx = totalTx - matchedTx;
-    const totalGen = filtered.generators.length;
-    const matchedGen = genGeometry.points.length; // matched if it found a host bus
-    const unmatchedGen = totalGen - matchedGen;
-    const totalSh = filtered.shunts.length;
-    const matchedSh = shuntGeometry.points.length;
-    const unmatchedSh = totalSh - matchedSh;
-    const totalLd = filtered.loads.length;
-    const matchedLd = loadGeometry.points.length;
-    const unmatchedLd = totalLd - matchedLd;
-    return { totalLines, matchedLines, unmatchedLines, totalTx, matchedTx, unmatchedTx, totalGen, matchedGen, unmatchedGen, totalSh, matchedSh, unmatchedSh, totalLd, matchedLd, unmatchedLd };
-  }, [filtered.lines, filtered.transformers, filtered.generators, filtered.shunts, filtered.loads, edgeData, transformerEdgeData, genGeometry.points.length, shuntGeometry.points.length, loadGeometry.points.length]);
+  // const matchStats = useMemo(() => {
+  //   const totalLines = filtered.lines.length;
+  //   const matchedLines = edgeData.length;
+  //   const unmatchedLines = totalLines - matchedLines;
+  //   const totalTx = filtered.transformers.length;
+  //   const matchedTx = transformerEdgeData.length;
+  //   const unmatchedTx = totalTx - matchedTx;
+  //   const totalGen = filtered.generators.length;
+  //   const matchedGen = genGeometry.points.length; // matched if it found a host bus
+  //   const unmatchedGen = totalGen - matchedGen;
+  //   const totalSh = filtered.shunts.length;
+  //   const matchedSh = shuntGeometry.points.length;
+  //   const unmatchedSh = totalSh - matchedSh;
+  //   const totalLd = filtered.loads.length;
+  //   const matchedLd = loadGeometry.points.length;
+  //   const unmatchedLd = totalLd - matchedLd;
+  //   return { totalLines, matchedLines, unmatchedLines, totalTx, matchedTx, unmatchedTx, totalGen, matchedGen, unmatchedGen, totalSh, matchedSh, unmatchedSh, totalLd, matchedLd, unmatchedLd };
+  // }, [filtered.lines, filtered.transformers, filtered.generators, filtered.shunts, filtered.loads, edgeData, transformerEdgeData, genGeometry.points.length, shuntGeometry.points.length, loadGeometry.points.length]);
 
   if (selectedGridId == null) {
     return (

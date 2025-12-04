@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import '../styles/components/MenuBar.css';
 import { useGridModel } from '../hooks/GridContext';
 import { useGridUpload } from '../hooks/useGridUpload';
-import ConfirmModal from './ConfirmModal';
 import ReusableConfirmModal from './ReusableConfirmModal';
 import { deleteGrid, calculatePowerFlow } from '../services/gridcalApi';
 

@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ReactElement } from 'react';
+import type { ReactElement } from 'react';
 
 /**
  * Converts a React SVG component to a data URL that can be used as an image source
