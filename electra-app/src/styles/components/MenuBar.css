@@ -7,8 +7,12 @@
     padding:0 12px; 
     font-family:system-ui,sans-serif; 
     user-select:none; 
-    position:relative; 
-    box-shadow:0 2px 4px rgba(0,0,0,.35); z-index:30; 
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    box-shadow:0 2px 4px rgba(0,0,0,.35); 
+    z-index:1000; 
 }
 .menubar-left { 
     display:flex; 
