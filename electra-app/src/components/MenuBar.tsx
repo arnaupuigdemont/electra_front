@@ -98,8 +98,6 @@ const MenuBar: React.FC = () => {
       label: 'File',
       items: [
   { label: isUploading ? 'Opening...' : 'Open…', action: (isUploading || selectedGridId != null) ? undefined : triggerFileDialog, disabled: isUploading || selectedGridId != null },
-        { label: 'Save (soon)', disabled: true },
-        { label: 'Export (soon)', disabled: true },
         { label: 'Close…', action: selectedGridId != null && !isUploading ? openCloseDialog : undefined, disabled: selectedGridId == null || isUploading }
       ]
     },

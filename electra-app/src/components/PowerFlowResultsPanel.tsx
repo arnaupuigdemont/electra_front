@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { Bus, Line, Transformer2W } from '../services/gridcalApi';
+import { downloadPowerFlowCSV } from '../utils/csvExport';
+import downloadIcon from '../assets/download_icon.png';
 import '../styles/components/InfoPanel.css'; // For animation keyframes
 
 interface BusResult {
@@ -166,6 +168,19 @@ const PowerFlowResultsPanel: React.FC<PowerFlowResultsPanelProps> = ({
     return n.toFixed(decimals);
   };
 
+  const handleDownloadCSV = () => {
+    downloadPowerFlowCSV({
+      busResults,
+      branchResults,
+      buses,
+      orderedBusIds,
+      orderedLines,
+      orderedTransformers,
+      converged,
+      error
+    });
+  };
+
   if (isCollapsed) {
     return (
       <div style={wrapperStyle}>
@@ -205,6 +220,22 @@ const PowerFlowResultsPanel: React.FC<PowerFlowResultsPanelProps> = ({
         <div style={headerStyle}>
           <div style={titleStyle}>
             <span>Power Flow Results</span>
+            <button
+              onClick={handleDownloadCSV}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '2px 6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: 4
+              }}
+              title="Download CSV"
+            >
+              <img src={downloadIcon} alt="Download" style={{ width: 18, height: 18 }} />
+            </button>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button 
