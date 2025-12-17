@@ -234,7 +234,7 @@ const PowerFlowResultsPanel: React.FC<PowerFlowResultsPanelProps> = ({
               }}
               title="Download CSV"
             >
-              <img src={downloadIcon} alt="Download" style={{ width: 18, height: 18 }} />
+              <img src={downloadIcon} alt="Download" style={{ width: 20, height: 20 }} />
             </button>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
