@@ -434,10 +434,11 @@ export interface Load {
   q_mvar?: number;
 }
 
-// Read base URL from Vite environment variable `VITE_API_BASE_URL` if present,
-// otherwise fall back to localhost. Set `VITE_API_BASE_URL` to e.g. http://localhost:8000
-// in `electra_front/electra-app/.env` or the environment running the dev server.
-const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000';
+// Si estamos en producción (build), usa '/gridcal' (Nginx).
+// Si estamos en desarrollo (npm run dev), usa localhost:8000.
+const BASE_URL = import.meta.env.PROD 
+  ? '/gridcal' 
+  : 'http://localhost:8000';
 
 export async function uploadGridFile(file: File): Promise<UploadResult> {
   const formData = new FormData();
