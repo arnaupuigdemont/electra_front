@@ -1,5 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { BusDetails, Load, Generator, Shunt, Line, Transformer2W } from '../services/gridcalApi';
+import {
+  updateBusStatus,
+  updateLineStatus,
+  updateGeneratorStatus,
+  updateLoadStatus,
+  updateShuntStatus,
+  updateTransformerStatus
+} from '../services/gridcalApi';
 import '../styles/components/InfoPanel.css';
 
 export type SelectedItem =
@@ -13,6 +21,7 @@ export type SelectedItem =
 interface InfoPanelProps {
   selected: SelectedItem | null;
   onClose: () => void;
+  onStatusUpdate?: (kind: string, id: number, newActive: boolean) => void;
   busDetails?: BusDetails | null;
   loadDetails?: Load | null;
   generatorDetails?: Generator | null;
@@ -23,7 +32,162 @@ interface InfoPanelProps {
 
 const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: 6 };
 
-const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, loadDetails, generatorDetails, shuntDetails, lineDetails, transformerDetails }) => {
+// Styles for the toggle switch
+const switchContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8
+};
+
+const switchStyle = (isActive: boolean, isUpdating: boolean): React.CSSProperties => ({
+  width: 40,
+  height: 20,
+  borderRadius: 10,
+  background: isActive ? '#22c55e' : '#475569',
+  cursor: isUpdating ? 'wait' : 'pointer',
+  position: 'relative',
+  transition: 'background 0.2s',
+  opacity: isUpdating ? 0.6 : 1
+});
+
+const switchKnobStyle = (isActive: boolean): React.CSSProperties => ({
+  width: 16,
+  height: 16,
+  borderRadius: '50%',
+  background: '#fff',
+  position: 'absolute',
+  top: 2,
+  left: isActive ? 22 : 2,
+  transition: 'left 0.2s'
+});
+
+const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, onStatusUpdate, busDetails, loadDetails, generatorDetails, shuntDetails, lineDetails, transformerDetails }) => {
+  // Local state for active status
+  const [isActive, setIsActive] = useState<boolean | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Sync local state with details
+  useEffect(() => {
+    if (!selected) {
+      setIsActive(null);
+      return;
+    }
+    switch (selected.kind) {
+      case 'bus':
+        setIsActive(busDetails?.active ?? null);
+        break;
+      case 'line':
+        setIsActive(lineDetails?.active ?? null);
+        break;
+      case 'transformer':
+        setIsActive(transformerDetails?.active ?? null);
+        break;
+      case 'generator':
+        setIsActive(generatorDetails?.active ?? null);
+        break;
+      case 'load':
+        setIsActive(loadDetails?.active ?? null);
+        break;
+      case 'shunt':
+        setIsActive(shuntDetails?.active ?? null);
+        break;
+      default:
+        setIsActive(null);
+    }
+  }, [selected, busDetails, lineDetails, transformerDetails, generatorDetails, loadDetails, shuntDetails]);
+
+  // Handle toggle
+  const handleToggle = useCallback(async () => {
+    if (isActive === null || isUpdating || !selected) return;
+    
+    const newStatus = !isActive;
+    setIsUpdating(true);
+    
+    try {
+      switch (selected.kind) {
+        case 'bus': {
+          const busId = selected.data.id ?? busDetails?.id;
+          if (busId != null) {
+            await updateBusStatus(busId, newStatus);
+            setIsActive(newStatus);
+            onStatusUpdate?.(selected.kind, busId, newStatus);
+          }
+          break;
+        }
+        case 'line': {
+          const lineId = selected.data.id ?? lineDetails?.id;
+          if (lineId != null) {
+            await updateLineStatus(lineId, newStatus);
+            setIsActive(newStatus);
+            onStatusUpdate?.(selected.kind, lineId, newStatus);
+          }
+          break;
+        }
+        case 'transformer': {
+          const transformerId = selected.data.id ?? transformerDetails?.id;
+          if (transformerId != null) {
+            await updateTransformerStatus(transformerId, newStatus);
+            setIsActive(newStatus);
+            onStatusUpdate?.(selected.kind, transformerId, newStatus);
+          }
+          break;
+        }
+        case 'generator': {
+          const generatorId = selected.data.id ?? generatorDetails?.id;
+          if (generatorId != null) {
+            await updateGeneratorStatus(generatorId, newStatus);
+            setIsActive(newStatus);
+            onStatusUpdate?.(selected.kind, generatorId, newStatus);
+          }
+          break;
+        }
+        case 'load': {
+          const loadId = selected.data.id ?? loadDetails?.id;
+          if (loadId != null) {
+            await updateLoadStatus(loadId, newStatus);
+            setIsActive(newStatus);
+            onStatusUpdate?.(selected.kind, loadId, newStatus);
+          }
+          break;
+        }
+        case 'shunt': {
+          const shuntId = selected.data.id ?? shuntDetails?.id;
+          if (shuntId != null) {
+            await updateShuntStatus(shuntId, newStatus);
+            setIsActive(newStatus);
+            onStatusUpdate?.(selected.kind, shuntId, newStatus);
+          }
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [isActive, isUpdating, selected, busDetails, lineDetails, transformerDetails, generatorDetails, loadDetails, shuntDetails, onStatusUpdate]);
+
+  // Render switch component
+  const renderActiveSwitch = () => {
+    if (isActive === null) return null;
+    
+    return (
+      <div style={rowStyle}>
+        <span>Active</span>
+        <div style={switchContainerStyle}>
+          <span style={{ color: '#94a3b8', fontSize: 12 }}>{isActive ? 'ON' : 'OFF'}</span>
+          <div 
+            style={switchStyle(isActive, isUpdating)} 
+            onClick={handleToggle}
+            title={isUpdating ? 'Updating...' : `Click to ${isActive ? 'deactivate' : 'activate'}`}
+          >
+            <div style={switchKnobStyle(isActive)} />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!selected) return null;
 
   const Box: React.CSSProperties = {
@@ -60,7 +224,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
               <>
                 <div style={Divider} />
                 <div style={rowStyle}><span>Slack</span><span style={Muted as any}>{String(busDetails.is_slack)}</span></div>
-                {busDetails.active != null && <div style={rowStyle}><span>Active</span><span style={Muted as any}>{String(busDetails.active)}</span></div>}
+                {renderActiveSwitch()}
                 {busDetails.is_dc != null && <div style={rowStyle}><span>DC</span><span style={Muted as any}>{String(busDetails.is_dc)}</span></div>}
                 
                 <div style={Divider} />
@@ -146,7 +310,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
 
                 <div style={Divider} />
                 <div style={{ ...Title, fontSize: 14 }}>Status</div>
-                <div style={rowStyle}><span>Active</span><span style={Muted as any}>{fmtBool(lineDetails.active)}</span></div>
+                {renderActiveSwitch()}
                 <div style={rowStyle}><span>Monitor Loading</span><span style={Muted as any}>{fmtBool(lineDetails.monitor_loading)}</span></div>
                 <div style={rowStyle}><span>Contingency Factor</span><span style={Muted as any}>{fmt(lineDetails.contingency_factor)}</span></div>
                 <div style={rowStyle}><span>Protection Rating Factor</span><span style={Muted as any}>{fmt(lineDetails.protection_rating_factor)}</span></div>
@@ -249,7 +413,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
 
                 <div style={Divider} />
                 <div style={{ ...Title, fontSize: 14 }}>Status</div>
-                <div style={rowStyle}><span>Active</span><span style={Muted as any}>{fmtBool(transformerDetails.active)}</span></div>
+                {renderActiveSwitch()}
                 <div style={rowStyle}><span>Monitor Loading</span><span style={Muted as any}>{fmtBool(transformerDetails.monitor_loading)}</span></div>
                 <div style={rowStyle}><span>Reducible</span><span style={Muted as any}>{fmtBool(transformerDetails.reducible)}</span></div>
                 <div style={rowStyle}><span>Build Status</span><span style={Muted as any}>{fmt(transformerDetails.build_status)}</span></div>
@@ -385,7 +549,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
 
                 <div style={Divider} />
                 <div style={{ ...Title, fontSize: 14 }}>Status</div>
-                <div style={rowStyle}><span>Active</span><span style={Muted as any}>{fmtBool(generatorDetails.active)}</span></div>
+                {renderActiveSwitch()}
                 <div style={rowStyle}><span>Is Controlled</span><span style={Muted as any}>{fmtBool(generatorDetails.is_controlled)}</span></div>
 
                 <div style={Divider} />
@@ -463,7 +627,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
                 {loadDetails.rdfid && <div style={rowStyle}><span>RDF ID</span><span style={Muted as any} title={loadDetails.rdfid}>{loadDetails.rdfid.slice(0, 12)}...</span></div>}
                 
                 <div style={Divider} />
-                {loadDetails.active != null && <div style={rowStyle}><span>Active</span><span style={Muted as any}>{String(loadDetails.active)}</span></div>}
+                {renderActiveSwitch()}
                 {loadDetails.conn && <div style={rowStyle}><span>Connection</span><span style={Muted as any}>{loadDetails.conn}</span></div>}
                 {loadDetails.use_kw != null && <div style={rowStyle}><span>Use kW</span><span style={Muted as any}>{String(loadDetails.use_kw)}</span></div>}
                 
@@ -608,7 +772,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ selected, onClose, busDetails, lo
 
                 <div style={Divider} />
                 <div style={{ ...Title, fontSize: 14 }}>Status</div>
-                <div style={rowStyle}><span>Active</span><span style={Muted as any}>{fmtBool(shuntDetails.active)}</span></div>
+                {renderActiveSwitch()}
                 <div style={rowStyle}><span>Scalable</span><span style={Muted as any}>{fmtBool(shuntDetails.scalable)}</span></div>
                 <div style={rowStyle}><span>Use kW</span><span style={Muted as any}>{fmtBool(shuntDetails.use_kw)}</span></div>
 

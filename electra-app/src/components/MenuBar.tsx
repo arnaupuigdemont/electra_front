@@ -14,7 +14,11 @@ interface MenuItem {
   }[];
 }
 
-const MenuBar: React.FC = () => {
+interface MenuBarProps {
+  onNavigateDocs?: () => void;
+}
+
+const MenuBar: React.FC<MenuBarProps> = ({ onNavigateDocs }) => {
   // Track which menu label is open so we can render left/right groups independently
   const [openLabel, setOpenLabel] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -98,8 +102,6 @@ const MenuBar: React.FC = () => {
       label: 'File',
       items: [
   { label: isUploading ? 'Opening...' : 'Open…', action: (isUploading || selectedGridId != null) ? undefined : triggerFileDialog, disabled: isUploading || selectedGridId != null },
-        { label: 'Save (soon)', disabled: true },
-        { label: 'Export (soon)', disabled: true },
         { label: 'Close…', action: selectedGridId != null && !isUploading ? openCloseDialog : undefined, disabled: selectedGridId == null || isUploading }
       ]
     },
@@ -113,7 +115,7 @@ const MenuBar: React.FC = () => {
         }
       ] 
     },
-    { label: 'Help', items: [{ label: 'Docs (soon)', disabled: true }, { label: 'About (soon)', disabled: true }] }
+    { label: 'Help', items: [{ label: 'Docs', action: onNavigateDocs }] }
   ];
 
   const leftMenus = menuModel.filter(m => m.label !== 'Help');
