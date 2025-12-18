@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import DeckGL from '@deck.gl/react';
 import { OrthographicView } from '@deck.gl/core';
 import { LineLayer } from '@deck.gl/layers';
@@ -10,6 +10,7 @@ import { useGridModel } from '../hooks/GridContext';
 import ElectricLoader from './ElectricLoader';
 import CalculatorLoader from './CalculatorLoader';
 import PowerFlowPanel from './PowerFlowPanel';
+import PowerFlowResultsPanel from './PowerFlowResultsPanel';
 import BusIcon from './grid-elements/BusIcon';
 import GeneratorIcon from './grid-elements/GeneratorIcon';
 import LoadIcon from './grid-elements/LoadIcon';
@@ -53,10 +54,12 @@ const GridViewer: React.FC = () => {
   const [transformerDetailsCache, setTransformerDetailsCache] = useState<Record<number, Transformer2W>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const { powerFlowResults, isPowerFlowCalculating } = useGridModel();
+  const { powerFlowResults, setPowerFlowResults, isPowerFlowCalculating } = useGridModel();
   // Ordered lists of IDs for mapping power flow results (index 0 = bus 1, index 1 = bus 2, etc.)
   const [orderedBusIds, setOrderedBusIds] = useState<number[]>([]);
   const [orderedLineIds, setOrderedLineIds] = useState<number[]>([]);
+  const [orderedLines, setOrderedLines] = useState<Line[]>([]);
+  const [orderedTransformers, setOrderedTransformers] = useState<Transformer2W[]>([]);
 
   // Handle panel close with slide-out animation
   const handleClose = () => {
@@ -66,6 +69,83 @@ const GridViewer: React.FC = () => {
       setIsClosing(false);
     }, 300); // Match animation duration
   };
+
+  // Handle status update - update only the specific element's active status locally
+  const handleStatusUpdate = useCallback((kind: string, id: number, newActive: boolean) => {
+    switch (kind) {
+      case 'bus': {
+        // Find the bus to get its idtag for finding connected elements
+        const bus = buses.find(b => b.id === id);
+        const busIdtag = bus?.idtag;
+        
+        setBuses(prev => prev.map(b => b.id === id ? { ...b, active: newActive } : b));
+        setBusDetailsCache(prev => {
+          if (prev[id]) return { ...prev, [id]: { ...prev[id], active: newActive } };
+          return prev;
+        });
+        
+        // When activating/deactivating a bus, also update connected elements
+        if (busIdtag) {
+          // Update generators connected to this bus
+          setGenerators(prev => prev.map(g => 
+            g.bus_idtag === busIdtag ? { ...g, active: newActive } : g
+          ));
+          // Update loads connected to this bus
+          setLoads(prev => prev.map(l => 
+            l.bus_idtag === busIdtag ? { ...l, active: newActive } : l
+          ));
+          // Update shunts connected to this bus
+          setShunts(prev => prev.map(s => 
+            s.bus_idtag === busIdtag ? { ...s, active: newActive } : s
+          ));
+          // Update lines connected to this bus
+          setLines(prev => prev.map(l => 
+            (l.bus_from_idtag === busIdtag || l.bus_to_idtag === busIdtag) ? { ...l, active: newActive } : l
+          ));
+          // Update transformers connected to this bus
+          setTransformers(prev => prev.map(t => 
+            (t.bus_from_idtag === busIdtag || t.bus_to_idtag === busIdtag) ? { ...t, active: newActive } : t
+          ));
+        }
+        break;
+      }
+      case 'line':
+        setLines(prev => prev.map(l => l.id === id ? { ...l, active: newActive } : l));
+        setLineDetailsCache(prev => {
+          if (prev[id]) return { ...prev, [id]: { ...prev[id], active: newActive } };
+          return prev;
+        });
+        break;
+      case 'transformer':
+        setTransformers(prev => prev.map(t => t.id === id ? { ...t, active: newActive } : t));
+        setTransformerDetailsCache(prev => {
+          if (prev[id]) return { ...prev, [id]: { ...prev[id], active: newActive } };
+          return prev;
+        });
+        break;
+      case 'generator':
+        setGenerators(prev => prev.map(g => g.id === id ? { ...g, active: newActive } : g));
+        setGeneratorDetailsCache(prev => {
+          if (prev[id]) return { ...prev, [id]: { ...prev[id], active: newActive } };
+          return prev;
+        });
+        break;
+      case 'load':
+        setLoads(prev => prev.map(l => l.id === id ? { ...l, active: newActive } : l));
+        setLoadDetailsCache(prev => {
+          if (prev[id]) return { ...prev, [id]: { ...prev[id], active: newActive } };
+          return prev;
+        });
+        break;
+      case 'shunt':
+        setShunts(prev => prev.map(s => s.id === id ? { ...s, active: newActive } : s));
+        setShuntDetailsCache(prev => {
+          if (prev[id]) return { ...prev, [id]: { ...prev[id], active: newActive } };
+          return prev;
+        });
+        break;
+    }
+  }, [buses]);
 
   // Get position of selected element
   const getElementPosition = (obj: any, layerId: string): [number, number] | null => {
@@ -174,12 +254,16 @@ const GridViewer: React.FC = () => {
         const sortedBusIds = [...gridBuses].sort((a, b) => a.id - b.id).map(b => b.id);
         
         // Branch results include both lines and transformers (in that order)
-        const sortedLineIds = [...gridLines].sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).map(l => l.id).filter((id): id is number => id != null);
-        const sortedTransformerIds = [...gridTransformers].sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).map(t => t.id).filter((id): id is number => id != null);
+        const sortedLines = [...gridLines].sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+        const sortedTransformers = [...gridTransformers].sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+        const sortedLineIds = sortedLines.map(l => l.id).filter((id): id is number => id != null);
+        const sortedTransformerIds = sortedTransformers.map(t => t.id).filter((id): id is number => id != null);
         const sortedBranchIds = [...sortedLineIds, ...sortedTransformerIds];
         
         setOrderedBusIds(sortedBusIds);
         setOrderedLineIds(sortedBranchIds);
+        setOrderedLines(sortedLines);
+        setOrderedTransformers(sortedTransformers);
         console.log(`Grid ${selectedGridId}: Created ordered lists - ${sortedBusIds.length} buses, ${sortedLineIds.length} lines, ${sortedTransformerIds.length} transformers, ${sortedBranchIds.length} total branches`);
       } catch (e: any) {
         setError(e?.message || 'Failed to load grid data');
@@ -430,6 +514,10 @@ const GridViewer: React.FC = () => {
     getPosition: (d: Bus) => [d.x, d.y],
     getSize: () => BUS_ICON_SIZE_PX * zoomMult,
     getColor: (d: Bus) => {
+      // Inactive elements appear gray
+      if (d.active === false) {
+        return [100, 100, 100, 150];
+      }
       const color = busColorMap.get(d.id);
       return color ? [...color, 255] : [255, 255, 255, 255];
     },
@@ -438,7 +526,7 @@ const GridViewer: React.FC = () => {
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
     parameters: { depthTest: false },
-    updateTriggers: { getSize: [zoomMult], getColor: [busColorMap] },
+    updateTriggers: { getSize: [zoomMult], getColor: [busColorMap, buses] },
   });
 
   const busNameLayer = new (DeckLayers as any).TextLayer({
@@ -480,9 +568,9 @@ const GridViewer: React.FC = () => {
         const a = posByIdtag.get(kFrom);
         const b = posByIdtag.get(kTo);
         if (!a || !b) return null;
-        return { source: a, target: b, fromKey: (l as any).bus_from_idtag, toKey: (l as any).bus_to_idtag, id: (l as any).id };
+        return { source: a, target: b, fromKey: (l as any).bus_from_idtag, toKey: (l as any).bus_to_idtag, id: (l as any).id, active: l.active };
       })
-      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string; id: number }[];
+      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string; id: number; active?: boolean }[];
   }, [filtered.lines, posByIdtag]);
 
   const transformerEdgeData = useMemo(() => {
@@ -494,9 +582,9 @@ const GridViewer: React.FC = () => {
         const a = posByIdtag.get(kFrom);
         const b = posByIdtag.get(kTo);
         if (!a || !b) return null;
-        return { source: a, target: b, fromKey: (t as any).bus_from_idtag, toKey: (t as any).bus_to_idtag, id: (t as any).id };
+        return { source: a, target: b, fromKey: (t as any).bus_from_idtag, toKey: (t as any).bus_to_idtag, id: (t as any).id, active: t.active };
       })
-      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string; id: number }[];
+      .filter(Boolean) as { source: [number, number]; target: [number, number]; fromKey: string; toKey: string; id: number; active?: boolean }[];
   }, [filtered.transformers, posByIdtag]);
 
   const lineLayer = new LineLayer({
@@ -505,6 +593,10 @@ const GridViewer: React.FC = () => {
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
     getColor: (d: any) => {
+      // Inactive lines appear gray
+      if (d.active === false) {
+        return [100, 100, 100, 100];
+      }
       const color = branchColorMap.get(d.id);
       return color ? [...color, 220] : [255, 255, 255, 220];
     },
@@ -512,7 +604,7 @@ const GridViewer: React.FC = () => {
     widthUnits: 'pixels',
     pickable: true,
     parameters: { depthTest: false },
-    updateTriggers: { getColor: [branchColorMap] },
+    updateTriggers: { getColor: [branchColorMap, lines] },
   });
 
   // Generators: compute node positions with slight offset from their host bus and a connector line
@@ -527,8 +619,8 @@ const GridViewer: React.FC = () => {
     const maxY = Math.max(...ys, 1);
     const span = Math.max(maxX - minX, maxY - minY) || 1;
     const dist = span * 0.02; // 2% of span
-    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string; id: number }> = [];
-    const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string }> = [];
+    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string; id: number; active?: boolean }> = [];
+    const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string; active?: boolean }> = [];
     const norm = (s?: string) => (s ?? '').trim().toLowerCase();
     for (const g of filtered.generators) {
       const k = norm((g as any).bus_idtag);
@@ -538,8 +630,8 @@ const GridViewer: React.FC = () => {
       const h = ((g.idtag || g.name || 'g').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 12) * (Math.PI / 6);
       const gx = busPos[0] + Math.cos(h) * dist;
       const gy = busPos[1] + Math.sin(h) * dist;
-      points.push({ position: [gx, gy], name: (g as any).name || g.idtag, idtag: g.idtag, bus_idtag: (g as any).bus_idtag, id: (g as any).id });
-      edges.push({ source: [gx, gy], target: busPos, fromKey: g.idtag, toKey: (g as any).bus_idtag });
+      points.push({ position: [gx, gy], name: (g as any).name || g.idtag, idtag: g.idtag, bus_idtag: (g as any).bus_idtag, id: (g as any).id, active: g.active });
+      edges.push({ source: [gx, gy], target: busPos, fromKey: g.idtag, toKey: (g as any).bus_idtag, active: g.active });
     }
     return { points, edges };
   }, [filtered.generators, filtered.buses, posByIdtag]);
@@ -547,15 +639,16 @@ const GridViewer: React.FC = () => {
   const generatorLayer = new (DeckLayers as any).IconLayer({
     id: 'generators-layer',
     data: genGeometry.points,
-    getIcon: () => ({ url: GENERATOR_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
+    getIcon: () => ({ url: GENERATOR_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: true }),
     getPosition: (d: any) => d.position,
     getSize: () => GENERATOR_ICON_SIZE_PX * zoomMult,
+    getColor: (d: any) => d.active === false ? [100, 100, 100, 150] : [255, 255, 255, 255],
     sizeUnits: 'pixels',
     sizeMinPixels: 10,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
     parameters: { depthTest: false },
-    updateTriggers: { getSize: [zoomMult] },
+    updateTriggers: { getSize: [zoomMult], getColor: [generators] },
   });
 
   const generatorConnectorLayer = new LineLayer({
@@ -563,11 +656,12 @@ const GridViewer: React.FC = () => {
     data: genGeometry.edges,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [255, 255, 255, 180],
+    getColor: (d: any) => d.active === false ? [100, 100, 100, 80] : [255, 255, 255, 180],
     getWidth: 2,
     widthUnits: 'pixels',
     pickable: false,
     parameters: { depthTest: false },
+    updateTriggers: { getColor: [generators] },
   });
 
   // Shunts: similar to generators (node + connector to host bus)
@@ -580,8 +674,8 @@ const GridViewer: React.FC = () => {
     const maxY = Math.max(...ys, 1);
     const span = Math.max(maxX - minX, maxY - minY) || 1;
     const dist = span * 0.015; // slightly closer than generators
-    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string; id: number }> = [];
-    const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string }> = [];
+    const points: Array<{ position: [number, number]; name: string; idtag: string; bus_idtag: string; id: number; active?: boolean }> = [];
+    const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string; active?: boolean }> = [];
     const norm = (s?: string) => (s ?? '').trim().toLowerCase();
     for (const s of filtered.shunts) {
       const k = norm((s as any).bus_idtag);
@@ -592,8 +686,8 @@ const GridViewer: React.FC = () => {
       const h = (base * (Math.PI / 6)) + Math.PI / 12; // 15 degrees offset from generators
       const sx = busPos[0] + Math.cos(h) * dist;
       const sy = busPos[1] + Math.sin(h) * dist;
-      points.push({ position: [sx, sy], name: (s as any).name || s.idtag, idtag: s.idtag, bus_idtag: (s as any).bus_idtag, id: (s as any).id });
-      edges.push({ source: [sx, sy], target: busPos, fromKey: s.idtag, toKey: (s as any).bus_idtag });
+      points.push({ position: [sx, sy], name: (s as any).name || s.idtag, idtag: s.idtag, bus_idtag: (s as any).bus_idtag, id: (s as any).id, active: s.active });
+      edges.push({ source: [sx, sy], target: busPos, fromKey: s.idtag, toKey: (s as any).bus_idtag, active: s.active });
     }
     return { points, edges };
   }, [filtered.shunts, filtered.buses, posByIdtag]);
@@ -601,15 +695,16 @@ const GridViewer: React.FC = () => {
   const shuntLayer = new (DeckLayers as any).IconLayer({
     id: 'shunts-layer',
     data: shuntGeometry.points,
-    getIcon: () => ({ url: SHUNT_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
+    getIcon: () => ({ url: SHUNT_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: true }),
     getPosition: (d: any) => d.position,
     getSize: () => SHUNT_ICON_SIZE_PX * zoomMult,
+    getColor: (d: any) => d.active === false ? [100, 100, 100, 150] : [255, 255, 255, 255],
     sizeUnits: 'pixels',
     sizeMinPixels: 10,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
     parameters: { depthTest: false },
-    updateTriggers: { getSize: [zoomMult] },
+    updateTriggers: { getSize: [zoomMult], getColor: [shunts] },
   });
 
   const shuntConnectorLayer = new LineLayer({
@@ -617,11 +712,12 @@ const GridViewer: React.FC = () => {
     data: shuntGeometry.edges,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [255, 255, 255, 180],
+    getColor: (d: any) => d.active === false ? [100, 100, 100, 80] : [255, 255, 255, 180],
     getWidth: 2,
     widthUnits: 'pixels',
     pickable: false,
     parameters: { depthTest: false },
+    updateTriggers: { getColor: [shunts] },
   });
 
   // Loads: node + connector to host bus; distinct offset and color
@@ -634,8 +730,8 @@ const GridViewer: React.FC = () => {
     const maxY = Math.max(...ys, 1);
     const span = Math.max(maxX - minX, maxY - minY) || 1;
     const dist = span * 0.018; // between shunts and generators
-    const points: Array<{ position: [number, number]; id?: number; name: string; idtag: string; bus_idtag: string; p_mw?: number; q_mvar?: number }> = [];
-    const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string }> = [];
+    const points: Array<{ position: [number, number]; id?: number; name: string; idtag: string; bus_idtag: string; p_mw?: number; q_mvar?: number; active?: boolean }> = [];
+    const edges: Array<{ source: [number, number]; target: [number, number]; fromKey: string; toKey: string; active?: boolean }> = [];
     const norm = (s?: string) => (s ?? '').trim().toLowerCase();
     for (const d of filtered.loads) {
       const k = norm((d as any).bus_idtag);
@@ -646,8 +742,8 @@ const GridViewer: React.FC = () => {
       const h = (base * (Math.PI / 6)) - Math.PI / 6; // -30 degrees shift
       const lx = busPos[0] + Math.cos(h) * dist;
       const ly = busPos[1] + Math.sin(h) * dist;
-      points.push({ position: [lx, ly], id: (d as any).id, name: (d as any).name || d.idtag, idtag: d.idtag, bus_idtag: (d as any).bus_idtag, p_mw: (d as any).p_mw, q_mvar: (d as any).q_mvar });
-      edges.push({ source: [lx, ly], target: busPos, fromKey: d.idtag, toKey: (d as any).bus_idtag });
+      points.push({ position: [lx, ly], id: (d as any).id, name: (d as any).name || d.idtag, idtag: d.idtag, bus_idtag: (d as any).bus_idtag, p_mw: (d as any).p_mw, q_mvar: (d as any).q_mvar, active: d.active });
+      edges.push({ source: [lx, ly], target: busPos, fromKey: d.idtag, toKey: (d as any).bus_idtag, active: d.active });
     }
     return { points, edges };
   }, [filtered.loads, filtered.buses, posByIdtag]);
@@ -655,15 +751,16 @@ const GridViewer: React.FC = () => {
   const loadLayer = new (DeckLayers as any).IconLayer({
     id: 'loads-layer',
     data: loadGeometry.points,
-    getIcon: () => ({ url: LOAD_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
+    getIcon: () => ({ url: LOAD_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: true }),
     getPosition: (d: any) => d.position,
     getSize: () => LOAD_ICON_SIZE_PX * zoomMult,
+    getColor: (d: any) => d.active === false ? [100, 100, 100, 150] : [255, 255, 255, 255],
     sizeUnits: 'pixels',
     sizeMinPixels: 10,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
     parameters: { depthTest: false },
-    updateTriggers: { getSize: [zoomMult] },
+    updateTriggers: { getSize: [zoomMult], getColor: [loads] },
   });
 
   const loadConnectorLayer = new LineLayer({
@@ -671,11 +768,12 @@ const GridViewer: React.FC = () => {
     data: loadGeometry.edges,
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
-    getColor: [255, 255, 255, 180],
+    getColor: (d: any) => d.active === false ? [100, 100, 100, 80] : [255, 255, 255, 180],
     getWidth: 2,
     widthUnits: 'pixels',
     pickable: false,
     parameters: { depthTest: false },
+    updateTriggers: { getColor: [loads] },
   });
 
   const transformerLayer = new LineLayer({
@@ -684,6 +782,10 @@ const GridViewer: React.FC = () => {
     getSourcePosition: (d: any) => d.source,
     getTargetPosition: (d: any) => d.target,
     getColor: (d: any) => {
+      // Inactive transformers appear gray
+      if (d.active === false) {
+        return [100, 100, 100, 100];
+      }
       const color = branchColorMap.get(d.id);
       return color ? [...color, 230] : [255, 255, 255, 230];
     },
@@ -691,7 +793,7 @@ const GridViewer: React.FC = () => {
     widthUnits: 'pixels',
     pickable: true,
     parameters: { depthTest: false },
-    updateTriggers: { getColor: [branchColorMap] },
+    updateTriggers: { getColor: [branchColorMap, transformers] },
   });
 
   // Transformer icons at the midpoint of each transformer line
@@ -699,22 +801,23 @@ const GridViewer: React.FC = () => {
     return transformerEdgeData.map(edge => {
       const midX = (edge.source[0] + edge.target[0]) / 2;
       const midY = (edge.source[1] + edge.target[1]) / 2;
-      return { position: [midX, midY], id: edge.id, fromKey: edge.fromKey, toKey: edge.toKey };
+      return { position: [midX, midY], id: edge.id, fromKey: edge.fromKey, toKey: edge.toKey, active: edge.active };
     });
   }, [transformerEdgeData]);
 
   const transformerIconLayer = new (DeckLayers as any).IconLayer({
     id: 'transformer-icons-layer',
     data: transformerIconData,
-    getIcon: () => ({ url: TRANSFORMER_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: false }),
+    getIcon: () => ({ url: TRANSFORMER_ICON_URL, width: 64, height: 64, anchorX: 32, anchorY: 32, mask: true }),
     getPosition: (d: any) => d.position,
     getSize: () => TRANSFORMER_ICON_SIZE_PX * zoomMult,
+    getColor: (d: any) => d.active === false ? [100, 100, 100, 150] : [255, 255, 255, 255],
     sizeUnits: 'pixels',
     sizeMinPixels: 12,
     pickable: true,
     loadOptions: { image: { crossOrigin: 'anonymous' } },
     parameters: { depthTest: false },
-    updateTriggers: { getSize: [zoomMult] },
+    updateTriggers: { getSize: [zoomMult], getColor: [transformers] },
   });
 
   // const matchStats = useMemo(() => {
@@ -862,7 +965,7 @@ const GridViewer: React.FC = () => {
             animation: isClosing ? 'slideOutToRight 0.3s ease-in forwards' : 'slideInFromRight 0.3s ease-out'
           }}>
           <div style={{ flex: selectedPowerFlowResult ? '1' : '1', minHeight: 0 }}>
-            <InfoPanel selected={selected} onClose={handleClose} busDetails={busDetails} loadDetails={loadDetails} generatorDetails={generatorDetails} shuntDetails={shuntDetails} lineDetails={lineDetails} transformerDetails={transformerDetails} />
+            <InfoPanel selected={selected} onClose={handleClose} onStatusUpdate={handleStatusUpdate} busDetails={busDetails} loadDetails={loadDetails} generatorDetails={generatorDetails} shuntDetails={shuntDetails} lineDetails={lineDetails} transformerDetails={transformerDetails} />
           </div>
           {selectedPowerFlowResult && (
             <div style={{ flexShrink: 0 }}>
@@ -874,6 +977,21 @@ const GridViewer: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+      
+      {/* Power Flow Results Panel - Left Side */}
+      {powerFlowResults && (
+        <PowerFlowResultsPanel
+          busResults={powerFlowResults.bus_results}
+          branchResults={powerFlowResults.branch_results}
+          buses={buses}
+          orderedBusIds={orderedBusIds}
+          orderedLines={orderedLines}
+          orderedTransformers={orderedTransformers}
+          converged={powerFlowResults.converged}
+          error={powerFlowResults.error}
+          onClose={() => setPowerFlowResults(null)}
+        />
       )}
     </div>
   );

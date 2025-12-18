@@ -26,6 +26,7 @@ export interface Bus {
   longitude?: number;
   latitude?: number;
   is_slack?: boolean;
+  active?: boolean;
 }
 
 export interface BusDetails extends Bus {
@@ -567,6 +568,86 @@ export async function calculatePowerFlow(grid_id: number): Promise<PowerFlowResu
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(text || `Failed to calculate power flow (${resp.status})`);
+  }
+  return resp.json();
+}
+
+// ===== STATUS UPDATE FUNCTIONS =====
+
+export async function updateBusStatus(bus_id: number, active: boolean): Promise<BusDetails> {
+  const resp = await fetch(`${BASE_URL}/bus/${bus_id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text || `Failed to update bus status (${resp.status})`);
+  }
+  return resp.json();
+}
+
+export async function updateLineStatus(line_id: number, active: boolean): Promise<Line> {
+  const resp = await fetch(`${BASE_URL}/line/${line_id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text || `Failed to update line status (${resp.status})`);
+  }
+  return resp.json();
+}
+
+export async function updateGeneratorStatus(generator_id: number, active: boolean): Promise<Generator> {
+  const resp = await fetch(`${BASE_URL}/generator/${generator_id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text || `Failed to update generator status (${resp.status})`);
+  }
+  return resp.json();
+}
+
+export async function updateLoadStatus(load_id: number, active: boolean): Promise<Load> {
+  const resp = await fetch(`${BASE_URL}/load/${load_id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text || `Failed to update load status (${resp.status})`);
+  }
+  return resp.json();
+}
+
+export async function updateShuntStatus(shunt_id: number, active: boolean): Promise<Shunt> {
+  const resp = await fetch(`${BASE_URL}/shunt/${shunt_id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text || `Failed to update shunt status (${resp.status})`);
+  }
+  return resp.json();
+}
+
+export async function updateTransformerStatus(transformer_id: number, active: boolean): Promise<Transformer2W> {
+  const resp = await fetch(`${BASE_URL}/transformer2w/${transformer_id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text || `Failed to update transformer status (${resp.status})`);
   }
   return resp.json();
 }
